@@ -1,0 +1,3 @@
+testfile/*
+.nextflow.log
+.nextflow.log.[1-9]

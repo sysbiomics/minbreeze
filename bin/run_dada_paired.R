@@ -90,6 +90,7 @@
 #               abundant than the sequence being tested).
 #    Ex: 1.0
 #
+#
 ### SPEED ARGUMENTS ###
 #
 # 16) nthreads - The number of threads to use.
@@ -124,6 +125,13 @@ chimeraMethod <- args[[14]]
 minParentFold <- as.numeric(args[[15]])
 nthreads <- as.integer(args[[16]])
 nreads.learn <- as.integer(args[[17]])
+
+#pool.raw <- tolower(as.character(args[[18]]))
+#
+#if(pool.raw %in% c("true", "t", "pool")){
+#
+#} else if(pool.raw %in% c("pseudo")) {
+#}
 
 ### VALIDATE ARGUMENTS ###
 
@@ -170,6 +178,7 @@ if(nthreads < 0) {
 ### LOAD LIBRARIES ###
 suppressWarnings(library(methods))
 suppressWarnings(library(dada2))
+suppressWarnings(library(ggplot2))
 cat("DADA2:", as.character(packageVersion("dada2")), "/",
     "Rcpp:", as.character(packageVersion("Rcpp")), "/",
     "RcppParallel:", as.character(packageVersion("RcppParallel")), "\n")
@@ -195,6 +204,14 @@ if(length(filtsF) == 0) { # All reads were filtered out
 cat("2) Learning Error Rates\n")
 errF <- suppressWarnings(learnErrors(filtsF, nreads=nreads.learn, multithread=multithread))
 errR <- suppressWarnings(learnErrors(filtsR, nreads=nreads.learn, multithread=multithread))
+
+## Plot error rate
+plot.errf <- plotErrors(errF, nominalQ=TRUE)
+plot.errr <- plotErrors(errR, nominalQ=TRUE)
+ggsave("qualplotF.pdf", plot.errf, device="pdf")
+ggsave("qualplotR.pdf", plot.errr, device="pdf")
+
+
 
 ### PROCESS ALL SAMPLES ###
 # Loop over rest in streaming fashion with learned error rates

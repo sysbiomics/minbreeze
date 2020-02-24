@@ -4,6 +4,8 @@
 */
 
 
+DAF_VERSION="0.00a"
+
 def helpMessage() {
   log.info"""
   --inputdir     Path to input data
@@ -12,6 +14,11 @@ def helpMessage() {
 }
 
 
+
+
+/* Configuration
+*/
+
 println("${params.getClass()}")
 // Show help message
 if (params.help){
@@ -19,12 +26,30 @@ if (params.help){
     exit 0
 }
 
+// Read config files
+
+conf = [:]
+
 pmatcher = "*_R{1,2}.fastq.gz"
 matcher = params.inputdir + "/" + pmatcher
-
 println("${matcher}" )
-params.fwdprimer = "CCTACGGGNGGCWGCAG"
-params.revprimer = "GACTACHVGGGTATCTAATCC"
+
+// Primers
+conf.fwdprimer = "CCTACGGGNGGCWGCAG"
+conf.revprimer = "GACTACHVGGGTATCTAATCC"
+conf.fwdprimerlen = 20
+conf.revprimerlen = 24
+// Denoiser
+// Classifier
+// conf.model="./res/gg99_341f-805r_classifier.qza"
+conf.model="./res/silva99_341f-805r_classifier.qza"
+conf.modelabs = new File(conf.model).getCanonicalPath();
+
+
+
+/* End of configuration
+*/
+
 
 /*
 *  Create a channel for input read files
@@ -53,18 +78,14 @@ process fastqc {
 }
 
 /*
-process multiqc {
-}
+  Trimming primer and quality. We don't use DADA2 for this because we *might*
+  want to try other pipeline instead.
 */
 
-/*
-  Trimming adapter and quality with BBDUK
 
-  Using DADA2 is a bit hard to automate, so we need to compromise on this
+/*  Determistic trimming, trim the front with set length.
 */
-literals=params.fwdprimer + "," + params.revprimer
-
-process bbduk {
+process dettrim {
 
   publishDir "${params.outputdir}", mode: 'copy'
   input:
@@ -76,15 +97,48 @@ process bbduk {
   file("trimmed/*.log")
 
   """
+  mkdir -p t_trimleft
   mkdir -p trimmed
-  echo ${reads[0]}
-  bbduk.sh -Xmx1g in=${reads[0]} in2=${reads[1]} out1=trimmed/${reads[0]} \
-  out2=trimmed/${reads[1]} \
-  literal=${literals} \
-  ktrim=l k=13 mink=6 hdist=1 qtrim=r trimq=15 \
-  minlength=150 restrictleft=25 copyundefined=T stats=trimmed/stat_${pair_id}.log \
-  2> run_${pair_id}.log
+  echo ${pair_id}
+  seqtk trimfq -b ${conf.fwdprimerlen} ${reads[0]} | gzip > t_trimleft/${reads[0]}
+  seqtk trimfq -b ${conf.revprimerlen} ${reads[1]} | gzip > t_trimleft/${reads[1]}
+
+  bbduk.sh -Xmx1g in=t_trimleft/${reads[0]} in2=t_trimleft/${reads[1]} \
+  out1=trimmed/${reads[0]} out2=trimmed/${reads[1]} \
+  qtrim=r trimq=15 \
+  minlength=150 stats=trimmed/stat_${pair_id}.log \
+  2> trimmed/run_${pair_id}.log
+  echo "Deterministic trim with ${conf.fwdprimerlen} ${conf.revprimerlen}" > trimmed/seqtk.log
   """
+}
+
+/* Trim primer/adapter with matching
+Current set to false
+*/
+if (false){
+    literals=conf.fwdprimer + "," + conf.revprimer
+    process heutrim {
+
+    publishDir "${params.outputdir}", mode: 'copy'
+    input:
+    set val(pair_id), file(reads) from ch_read_pairs
+
+    output:
+    file("trimmed/${reads[0]}") into ch_dada2forReads
+    file("trimmed/${reads[1]}") into ch_dada2revReads
+    file("trimmed/*.log")
+
+    """
+    mkdir -p trimmed
+    echo ${pair_id}
+    bbduk.sh -Xmx1g in=${reads[0]} in2=${reads[1]} out1=trimmed/${reads[0]} \
+    out2=trimmed/${reads[1]} \
+    literal=${literals} \
+    ktrim=l k=13 mink=6 hdist=1 qtrim=r trimq=15 \
+    minlength=150 restrictleft=25 copyundefined=T stats=trimmed/stat_${pair_id}.log \
+    2> trimmed/run_${pair_id}.log
+    """
+    }
 }
 
 
@@ -99,19 +153,18 @@ process dada2 {
   output:
     file("dadaraw.tsv") into ch_dada2ext
     file("track.tsv")
-    file("asv.tab")
-    file("repsep.fasta")
+    file("qualplotF.pdf")
+    file("qualplotR.pdf")
   """
   mkdir -p fwd
   mkdir -p rev
   mv ${freads} fwd
   mv ${rreads} rev
-  run_dada_paired.R fwd rev dadaraw.tsv track.tsv ff rf 0 0 0 0 2.0 2.0 2 consensus 1.0 ${task.cpus} 250000
+  run_dada_paired.R fwd rev dadaraw.tsv track.tsv ff rf 0 0 0 0 2.0 2.0 2 consensus 1.0 ${task.cpus} 1000000
   """
 }
 
-/*
-process dada2extract {
+process dada2ext {
   publishDir "${params.outputdir}/dada2", mode: "copy"
 
   input:
@@ -119,11 +172,107 @@ process dada2extract {
 
   output:
     file("asv.tab")
-    file("repsep.fasta")
+    file("repsep.fasta") into ch_qiime2_classify
 
   """
-  format_dada2.py ${rawasv}  # Produce asv.tab and repsep.fasta
+  format_dada2.py ${rawasv} # Produce asv.tab and repsep.fasta
+  """
+}
+
+/*
+process qiime2_roottree {
+
+  label 'big_cpu'
+  publishDir "${params.outputdir}/qiime2_analysis"
+
+  """
   """
 }
 */
 
+process qiime2_bayes {
+
+  label 'mod_cpu'
+  publishDir "${params.outputdir}/qiime2_analysis"
+
+  input:
+    file repsep_fasta from ch_qiime2_classify
+
+  output:
+    file("rooted-tree.qza")
+    file("unrooted-tree.qza")
+    file("sequences.qza")
+    tuple file("rooted-tree.qza"), file("taxonomy.qza") into ch_qiime2_export
+
+  """
+  model=${conf.modelabs}
+
+  qiime tools import --input-path ${repsep_fasta} \
+    --output-path sequences.qza \
+    --type 'FeatureData[Sequence]'
+
+  qiime phylogeny align-to-tree-mafft-fasttree \
+    --i-sequences sequences.qza \
+    --o-alignment aligned-rep-seqs.qza \
+    --o-masked-alignment masked-aligned-rep-seqs.qza \
+    --o-tree unrooted-tree.qza \
+    --o-rooted-tree rooted-tree.qza
+
+  qiime feature-classifier classify-sklearn \
+    --i-classifier \${model} \
+    --p-n-jobs ${task.cpus} \
+    --i-reads  sequences.qza \
+    --o-classification taxonomy.qza
+  """
+}
+
+process qiime2_export {
+
+  publishDir "${params.outputdir}/qiime2_analysis"
+
+  input:
+    tuple file("rooted-tree.qza"), file("taxonomy.qza") from ch_qiime2_export
+  output:
+    file("rooted-tree.nwk")
+    file("taxonomy.tsv")
+
+  shell:
+  '''
+  # Extract file from qiime2
+  extract_fl () {
+    local zipfile=$1
+    local lookfor=$2
+    local location_z=$(unzip -l $zipfile  | gawk '{print $4}' | grep ${lookfor})  # Hack, but work
+    echo $location_z
+    # Unzip extract a lot of file, so force overwrite is neccessary
+    unzip -o -j $zipfile $location_z
+  }
+
+  extract_fl rooted-tree.qza tree.nwk
+  mv tree.nwk rooted-tree.nwk
+  extract_fl taxonomy.qza taxonomy.tsv
+
+  # Use python script to convert them into mothur format.
+
+  '''
+}
+
+process param_report {
+
+  publishDir "${params.outputdir}"
+
+  shell:
+  '''
+  echo "Export all param used into files"
+  '''
+}
+
+process report_gen {
+  publishDir "${params.outputdir}"
+
+  shell:
+  '''
+  echo "Export all param used into files"
+  '''
+
+}

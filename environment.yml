@@ -1,4 +1,4 @@
-name: minflow=0.0.0a
+name: minflow_0.0a
 channels:
 - qiime2/label/r2019.7
 - conda-forge
