@@ -42,6 +42,8 @@ with open("repsep.fasta", "w") as fho:
 a.index = id_md5
 a.index.name = indexname
 # Rename
+if MANIFEST:
+    a = a.rename(columns=renmapper)
 
 with open("asv.tab", "w") as fho:
     a.to_csv(fho, sep="\t")

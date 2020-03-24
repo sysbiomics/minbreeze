@@ -10,6 +10,7 @@ def helpMessage() {
   log.info"""
   --inputdir     Path to input data
   --outputdir    Path to output data
+  --manifest     Path to manifest
   """.stripIndent()
 }
 
@@ -32,7 +33,9 @@ conf = [:]
 
 pmatcher = "*_R{1,2}.fastq.gz"
 matcher = params.inputdir + "/" + pmatcher
-println("${matcher}" )
+
+// Manifest (check if == NONE)
+// conf.manifest = new File(params.manifest).getCanonicalPath();
 
 // Primers
 conf.fwdprimer = "CCTACGGGNGGCWGCAG"
@@ -41,9 +44,13 @@ conf.fwdprimerlen = 20
 conf.revprimerlen = 24
 // Denoiser
 // Classifier
-// conf.model="./res/gg99_341f-805r_classifier.qza"
-conf.model="./res/silva99_341f-805r_classifier.qza"
+conf.model="./res/gg99_341f-805r_classifier.qza"
+//conf.model="./res/silva99_341f-805r_classifier.qza"
 conf.modelabs = new File(conf.model).getCanonicalPath();
+// Root tree for fragment insertion
+conf.roottree="./res/sepp-refs-gg-13-8.qza"
+conf.roottreeabs=new File(conf.roottree).getCanonicalPath();
+
 
 
 
@@ -73,7 +80,8 @@ process fastqc {
 
   shell:
   """
-  fastqc ${reads}
+  fastqc ${reads[0]}
+  fastqc ${reads[1]}
   """
 }
 
@@ -112,9 +120,9 @@ process dettrim {
   """
 }
 
-/* Trim primer/adapter with matching
-Current set to false
-*/
+//Trim primer/adapter with matching
+// Current set to false
+
 if (false){
     literals=conf.fwdprimer + "," + conf.revprimer
     process heutrim {
@@ -132,11 +140,11 @@ if (false){
     mkdir -p trimmed
     echo ${pair_id}
     bbduk.sh -Xmx1g in=${reads[0]} in2=${reads[1]} out1=trimmed/${reads[0]} \
-    out2=trimmed/${reads[1]} \
-    literal=${literals} \
-    ktrim=l k=13 mink=6 hdist=1 qtrim=r trimq=15 \
-    minlength=150 restrictleft=25 copyundefined=T stats=trimmed/stat_${pair_id}.log \
-    2> trimmed/run_${pair_id}.log
+      out2=trimmed/${reads[1]} \
+      literal=${literals} \
+      ktrim=l k=13 mink=6 hdist=1 qtrim=r trimq=15 \
+      minlength=150 restrictleft=25 copyundefined=T stats=trimmed/stat_${pair_id}.log \
+      2> trimmed/run_${pair_id}.log
     """
     }
 }
@@ -172,41 +180,25 @@ process dada2ext {
 
   output:
     file("asv.tab")
-    file("repsep.fasta") into ch_qiime2_classify
+    file("repsep.fasta") into ch_qiime2_roottree
+    file("repsep.fasta") into ch_qiime2_bayes
 
   """
-  format_dada2.py ${rawasv} # Produce asv.tab and repsep.fasta
+  format_dada2.py ${rawasv} ${conf.manifest} # Produce asv.tab and repsep.fasta
   """
 }
 
-/*
 process qiime2_roottree {
 
-  label 'big_cpu'
-  publishDir "${params.outputdir}/qiime2_analysis"
-
-  """
-  """
-}
-*/
-
-process qiime2_bayes {
-
   label 'mod_cpu'
-  publishDir "${params.outputdir}/qiime2_analysis"
-
+  publishDir "${params.outputdir}/qiime2_analysis", mode: 'copy'
   input:
-    file repsep_fasta from ch_qiime2_classify
-
+    file repsep_fasta from ch_qiime2_roottree
   output:
     file("rooted-tree.qza")
-    file("unrooted-tree.qza")
-    file("sequences.qza")
-    tuple file("rooted-tree.qza"), file("taxonomy.qza") into ch_qiime2_export
+    file("rooted-tree.nwk")
 
   """
-  model=${conf.modelabs}
-
   qiime tools import --input-path ${repsep_fasta} \
     --output-path sequences.qza \
     --type 'FeatureData[Sequence]'
@@ -218,43 +210,63 @@ process qiime2_bayes {
     --o-tree unrooted-tree.qza \
     --o-rooted-tree rooted-tree.qza
 
+  extract_fl () {
+    local zipfile=\$1
+    local lookfor=\$2
+    local location_z=\$(unzip -l \$zipfile  | gawk '{print \$4}' | grep \$lookfor)  # Hack, but work
+    echo \$location_z
+    # Unzip extract a lot of file, so force overwrite is neccessary
+    unzip -o -j \$zipfile \$location_z
+  }
+
+  extract_fl rooted-tree.qza rooted-tree.nwk
+  """
+}
+
+  //#qiime fragment-insertion sepp \
+  //#  --i-representative-sequences ./sequences.qza \
+  //#  --i-reference-database ${conf.roottreeabs} \
+  //#  --o-tree ./rooted-tree.qza \
+  //#  --o-placements ./tree_placements.qza \
+  //#  --p-threads 1  # update to a higher number if you can
+
+process qiime2_bayes {
+
+  label 'mod_cpu'
+  publishDir "${params.outputdir}/qiime2_analysis", mode: 'copy'
+
+
+  input:
+    file repsep_fasta from ch_qiime2_bayes
+
+  output:
+    file("taxonomy.qza")
+    file("taxonomy.tsv")
+
+  """
+  model=${conf.modelabs}
+
+  qiime tools import --input-path ${repsep_fasta} \
+    --output-path sequences.qza \
+    --type 'FeatureData[Sequence]'
+
   qiime feature-classifier classify-sklearn \
     --i-classifier \${model} \
     --p-n-jobs ${task.cpus} \
     --i-reads  sequences.qza \
     --o-classification taxonomy.qza
-  """
-}
 
-process qiime2_export {
-
-  publishDir "${params.outputdir}/qiime2_analysis"
-
-  input:
-    tuple file("rooted-tree.qza"), file("taxonomy.qza") from ch_qiime2_export
-  output:
-    file("rooted-tree.nwk")
-    file("taxonomy.tsv")
-
-  shell:
-  '''
-  # Extract file from qiime2
   extract_fl () {
-    local zipfile=$1
-    local lookfor=$2
-    local location_z=$(unzip -l $zipfile  | gawk '{print $4}' | grep ${lookfor})  # Hack, but work
-    echo $location_z
+    local zipfile=\$1
+    local lookfor=\$2
+    local location_z=\$(unzip -l \$zipfile  | gawk '{print \$4}' | grep \$lookfor)  # Hack, but work
+    echo \$location_z
     # Unzip extract a lot of file, so force overwrite is neccessary
-    unzip -o -j $zipfile $location_z
+    unzip -o -j \$zipfile \$location_z
   }
 
-  extract_fl rooted-tree.qza tree.nwk
-  mv tree.nwk rooted-tree.nwk
   extract_fl taxonomy.qza taxonomy.tsv
-
-  # Use python script to convert them into mothur format.
-
-  '''
+  """
 }
 
 process param_report {

@@ -2,4 +2,4 @@
 
 # Download testfile
 
-nextflow run main.nf --inputdir testin/ --outputdir testout -profile lipid,conda -resume
+nextflow run main.nf --inputdir testin/ --outputdir testout --manifest testin/manifest.tsv -profile lipid,conda -resume
