@@ -3,6 +3,11 @@
 *
 */
 
+// For loading config from yaml
+import java.nio.file.Files
+import java.nio.file.Paths
+import org.yaml.snakeyaml.Yaml
+
 
 DAF_VERSION="0.00a"
 
@@ -11,11 +16,9 @@ def helpMessage() {
   --inputdir     Path to input data
   --outputdir    Path to output data
   --manifest     Path to manifest
+  --config       Path to config
   """.stripIndent()
 }
-
-
-
 
 /* Configuration
 */
@@ -28,24 +31,23 @@ if (params.help){
 }
 
 // Read config files
-
-conf = [:]
-
 pmatcher = "*_R{1,2}.fastq.gz"
 matcher = params.inputdir + "/" + pmatcher
 
+// Start moving config to config file
+conf = [:]
+
 // Manifest (check if == NONE)
-// conf.manifest = new File(params.manifest).getCanonicalPath();
+def extconf = (Map)new Yaml().load(Files.newInputStream(Paths.get("./param.conf")))
 
 // Primers
 conf.fwdprimer = "CCTACGGGNGGCWGCAG"
 conf.revprimer = "GACTACHVGGGTATCTAATCC"
-conf.fwdprimerlen = 20
-conf.revprimerlen = 24
+conf.fwdprimerlen = extconf["fwdprimerlen"]
+conf.revprimerlen = extconf["revprimerlen"]
+conf.model = extconf["model"]
 // Denoiser
 // Classifier
-conf.model="./res/gg99_341f-805r_classifier.qza"
-//conf.model="./res/silva99_341f-805r_classifier.qza"
 conf.modelabs = new File(conf.model).getCanonicalPath();
 // Root tree for fragment insertion
 conf.roottree="./res/sepp-refs-gg-13-8.qza"
@@ -122,6 +124,7 @@ process dettrim {
 
 //Trim primer/adapter with matching
 // Current set to false
+// Maybe I should use this AFTER det trim to make sure that everything is clean
 
 if (false){
     literals=conf.fwdprimer + "," + conf.revprimer
