@@ -153,6 +153,8 @@ if (false){
 }
 
 
+/* Denoise
+*/
 process dada2 {
   label 'big_cpu'
 
@@ -191,6 +193,10 @@ process dada2ext {
   """
 }
 
+/*
+  Building phylogenetic tree
+*/
+
 process qiime2_roottree {
 
   label 'mod_cpu'
@@ -222,7 +228,8 @@ process qiime2_roottree {
     unzip -o -j \$zipfile \$location_z
   }
 
-  extract_fl rooted-tree.qza rooted-tree.nwk
+  extract_fl rooted-tree.qza tree.nwk
+  mv tree.nwk rooted-tree.nwk
   """
 }
 
@@ -233,11 +240,52 @@ process qiime2_roottree {
   //#  --o-placements ./tree_placements.qza \
   //#  --p-threads 1  # update to a higher number if you can
 
-process qiime2_bayes {
+if (false) {
+process qiime2_blast {
 
   label 'mod_cpu'
   publishDir "${params.outputdir}/qiime2_analysis", mode: 'copy'
 
+
+  input:
+    file repsep_fasta from ch_qiime2_bayes
+
+  output:
+    file("taxonomy.qza")
+    file("taxonomy.tsv")
+
+  """
+  model=${conf.modelabs}
+
+  qiime tools import --input-path ${repsep_fasta} \
+    --output-path sequences.qza \
+    --type 'FeatureData[Sequence]'
+
+  qiime feature-classifier classify-consensus-blast \
+    --i-query sequences.qza \
+    --i-reference-reads ${baseDir}/res/gg99_seq.qza \
+    --i-reference-taxonomy ${baseDir}/res/gg99_tax.qza \
+    --o-classification taxonomy.qza \
+    --p-strand 'plus' \
+    --p-unassignable-label unassigned
+
+  extract_fl () {
+    local zipfile=\$1
+    local lookfor=\$2
+    local location_z=\$(unzip -l \$zipfile  | gawk '{print \$4}' | grep \$lookfor)  # Hack, but work
+    echo \$location_z
+    # Unzip extract a lot of file, so force overwrite is neccessary
+    unzip -o -j \$zipfile \$location_z
+  }
+
+  extract_fl taxonomy.qza taxonomy.tsv
+  """
+}
+}
+process qiime2_bayes {
+
+  label 'mod_cpu'
+  publishDir "${params.outputdir}/qiime2_analysis", mode: 'copy'
 
   input:
     file repsep_fasta from ch_qiime2_bayes
