@@ -90,7 +90,6 @@
 #               abundant than the sequence being tested).
 #    Ex: 1.0
 #
-#
 ### SPEED ARGUMENTS ###
 #
 # 16) nthreads - The number of threads to use.
@@ -100,6 +99,9 @@
 # 17) nreads_learn - The minimum number of reads to learn the error model from.
 #                 Special values: 0 - Use all input reads.
 #    Ex: 1000000
+#
+# 18) pool.raw - The pooling method to use, you could use TRUE (pooling), or pseudo, or anything else (not pooling)
+#    Ex: "pseudo"
 #
 
 cat(R.version$version.string, "\n")
@@ -125,13 +127,7 @@ chimeraMethod <- args[[14]]
 minParentFold <- as.numeric(args[[15]])
 nthreads <- as.integer(args[[16]])
 nreads.learn <- as.integer(args[[17]])
-
-#pool.raw <- tolower(as.character(args[[18]]))
-#
-#if(pool.raw %in% c("true", "t", "pool")){
-#
-#} else if(pool.raw %in% c("pseudo")) {
-#}
+pool.raw <- tolower(as.character(args[[18]]))
 
 ### VALIDATE ARGUMENTS ###
 
@@ -152,6 +148,15 @@ if(!(dir.exists(inp.dirF) && dir.exists(inp.dirR))) {
   if(length(unfiltsF) != length(unfiltsR)) {
     errQuit("Different numbers of forward and reverse .fastq.gz files.")
   }
+}
+
+# Convert pool argument
+if(pool.raw %in% c("true", "t", "pool")){
+  pool.method=TRUE
+} else if(pool.raw %in% c("pseudo")) {
+  pool.method="pseudo"
+} else {
+  pool.method=FALSE
 }
 
 # Output files are to be filenames (not directories) and are to be
@@ -212,22 +217,41 @@ ggsave("qualplotF.pdf", plot.errf, device="pdf")
 ggsave("qualplotR.pdf", plot.errr, device="pdf")
 
 
-
 ### PROCESS ALL SAMPLES ###
-# Loop over rest in streaming fashion with learned error rates
-denoisedF <- rep(0, length(filtsF))
-mergers <- vector("list", length(filtsF))
-cat("3) Denoise remaining samples ")
-for(j in seq(length(filtsF))) {
-  drpF <- derepFastq(filtsF[[j]])
-  ddF <- dada(drpF, err=errF, multithread=multithread, verbose=FALSE)
-  drpR <- derepFastq(filtsR[[j]])
-  ddR <- dada(drpR, err=errR, multithread=multithread, verbose=FALSE)
-  mergers[[j]] <- mergePairs(ddF, drpF, ddR, drpR)
-  denoisedF[[j]] <- getN(ddF)
-  cat(".")
+if (isTRUE(pool.method) | pool.method == "pseudo"){
+  # Pool method
+  cat(paste0("Denoise with pooling method = ", as.character(pool.method)))
+  dadaFs <- dada(filtsF, err=errF, pool = pool.method, multithread=multithread)
+  dadaRs <- dada(filtsR, err=errR, pool = pool.method, multithread=multithread)
+  mergers <- mergePairs(dadaFs, filtsF, dadaRs, filtsR)
+  denoisedF <- unlist(lapply(dadaFs, getN), use.names = FALSE)
+  # Make sequence table
+  seqtab <- makeSequenceTable(mergers)
+
+} else if (isFALSE(pool.method)){
+  # BIG DATA APPROACH
+  # Loop over rest in streaming fashion with learned error rates
+  cat("Denoise without pooling method")
+  denoisedF <- rep(0, length(filtsF))
+  mergers <- vector("list", length(filtsF))
+  cat("3) Denoise remaining samples ")
+  for(j in seq(length(filtsF))) {
+    drpF <- derepFastq(filtsF[[j]])
+    ddF <- dada(drpF, err=errF, multithread=multithread, verbose=FALSE)
+    drpR <- derepFastq(filtsR[[j]])
+    ddR <- dada(drpR, err=errR, multithread=multithread, verbose=FALSE)
+    mergers[[j]] <- mergePairs(ddF, drpF, ddR, drpR)
+    denoisedF[[j]] <- getN(ddF)
+    cat(".")
+  }
+} else {
+  # Should be here
+  cat("Hey, I think you are doing it wrong")
+  quit(1)
 }
+
 cat("\n")
+
 
 # Make sequence table
 seqtab <- makeSequenceTable(mergers)

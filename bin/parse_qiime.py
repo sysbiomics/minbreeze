@@ -49,9 +49,11 @@ def rdp_parse(s):
     taxa_dct = {"kingdom": "", "phylum": "", "class": "", "order": "",
                 "family": "", "genus": "", "species": ""}
     tokens = s.split(";")
-    if tokens[0] == "Ambiguous_taxa" or token == "Unassigned":
-        return taxa_dct
+    #if tokens[0] == "Ambiguous_taxa" or tokens[0] == "Unassigned":
+    #    return taxa_dct
     for token in tokens: # D_0__Bacteria, or Ambiguous_taxa
+        if token == "Ambiguous_taxa" or token == "Unassigned":
+            return taxa_dct
         taxLv, taxName = token.split("__")
         # Make the output behave like GG parse
         taxLv = abbr_dct[taxLv]
@@ -67,7 +69,9 @@ alignment = ["kingdom", "phylum", "class", "order", "family", "genus", "species"
 
 taxa_table = pd.read_csv(inp, sep="\t")
 taxa_str = pd.DataFrame.from_records(taxa_table.Taxon.apply(rdp_parse)).reindex(columns=alignment)
-taxa_tab = pd.concat([taxa_table["Feature ID"], taxa_str, taxa_table["Confidence"]], axis=1)
+# First and last column are
+#taxa_tab = pd.concat([taxa_table["Feature ID"], taxa_str, taxa_table["Confidence"]], axis=1)
+taxa_tab = pd.concat([taxa_table.iloc[:, 0], taxa_str, taxa_table.iloc[:,-1]], axis=1)
 taxa_tab = taxa_tab.set_index("Feature ID")
 
 taxa_tab.to_csv(oup, sep="\t")

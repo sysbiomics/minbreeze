@@ -31,7 +31,7 @@ if (params.help){
 }
 
 // Read config files
-pmatcher = "*_R{1,2}.fastq.gz"
+pmatcher = "*_R{1,2}_001.fastq.gz"
 matcher = params.inputdir + "/" + pmatcher
 
 // Start moving config to config file
@@ -41,24 +41,18 @@ conf = [:]
 def extconf = (Map)new Yaml().load(Files.newInputStream(Paths.get("./param.conf")))
 
 // Primers
-conf.fwdprimer = "CCTACGGGNGGCWGCAG"
-conf.revprimer = "GACTACHVGGGTATCTAATCC"
 conf.fwdprimerlen = extconf["fwdprimerlen"]
 conf.revprimerlen = extconf["revprimerlen"]
-conf.model = extconf["model"]
 // Denoiser
+conf.pool = extconf["pool"]
 // Classifier
+conf.model = extconf["model"]
 conf.modelabs = new File(conf.model).getCanonicalPath();
 // Root tree for fragment insertion
 conf.roottree="./res/sepp-refs-gg-13-8.qza"
 conf.roottreeabs=new File(conf.roottree).getCanonicalPath();
-
-
-
-
 /* End of configuration
 */
-
 
 /*
 *  Create a channel for input read files
@@ -156,7 +150,7 @@ if (false){
 /* Denoise
 */
 process dada2 {
-  label 'big_cpu'
+  label 'big_cpu','dada2'
 
   publishDir "${params.outputdir}/dada2", mode: "copy"
   input:
@@ -173,7 +167,7 @@ process dada2 {
   mkdir -p rev
   mv ${freads} fwd
   mv ${rreads} rev
-  run_dada_paired.R fwd rev dadaraw.tsv track.tsv ff rf 0 0 0 0 2.0 2.0 2 consensus 1.0 ${task.cpus} 1000000
+  run_dada_paired.R fwd rev dadaraw.tsv track.tsv ff rf 0 0 0 0 2.0 2.0 2 consensus 1.0 ${task.cpus} 1000000 ${conf.pool}
   """
 }
 
