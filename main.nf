@@ -6,73 +6,52 @@
 // For loading config from yaml
 import java.nio.file.Files
 import java.nio.file.Paths
-import org.yaml.snakeyaml.Yaml
 
-
-DAF_VERSION="0.00a"
+nextflow.preview.dsl=2
 
 def helpMessage() {
   log.info"""
   --inputdir     Path to input data
   --outputdir    Path to output data
-  --manifest     Path to manifest
   --config       Path to config
   """.stripIndent()
 }
 
-/* Configuration
-*/
-
-println("${params.getClass()}")
-// Show help message
+// Help message
 if (params.help){
     helpMessage()
     exit 0
 }
-
+/* Configuration
+*/
 // Read config files
-pmatcher = "*_R{1,2}_001.fastq.gz"
+pmatcher = params.matcher
 matcher = params.inputdir + "/" + pmatcher
 
 // Start moving config to config file
-conf = [:]
+def validateParams(){
+}
 
-// Manifest (check if == NONE)
-def extconf = (Map)new Yaml().load(Files.newInputStream(Paths.get("./param.conf")))
-
-// Primers
-conf.fwdprimerlen = extconf["fwdprimerlen"]
-conf.revprimerlen = extconf["revprimerlen"]
-// Denoiser
-conf.pool = extconf["pool"]
-// Classifier
-conf.model = extconf["model"]
-conf.modelabs = new File(conf.model).getCanonicalPath();
+params.modelabs = new File(params.model).getCanonicalPath();
 // Root tree for fragment insertion
-conf.roottree="./res/sepp-refs-gg-13-8.qza"
-conf.roottreeabs=new File(conf.roottree).getCanonicalPath();
+params.roottreeabs= new File(params.modeltree).getCanonicalPath();
+params.manifestabs= new File(params.manifest).getCanonicalPath();
+// BLAST or vsearch
+params.refseqabs = new File(params.refseq).getCanonicalPath();
+params.reftaxabs = new File(params.reftax).getCanonicalPath();
+
 /* End of configuration
 */
 
-/*
-*  Create a channel for input read files
-*/
-
-Channel
-  .fromFilePairs(matcher)
-  .ifEmpty { exit 1, "Cannot find anything here chief"}
-  .into { ch_read_pairs; ch_read_pairs_fastqc}
-
-/*
-  Start with FASTQC to report initial result
-*/
 process fastqc {
+
   publishDir "${params.outputdir}/fastqc", mode: 'copy'
+
   input:
-  set val(pair_id), file(reads) from ch_read_pairs_fastqc
+    tuple val(pair_id), file(reads)
   output:
-  file "*.html"
-  file "*.zip"
+    file "*.html"
+    file "*.zip"
 
   shell:
   """
@@ -86,105 +65,85 @@ process fastqc {
   want to try other pipeline instead.
 */
 
-
 /*  Determistic trimming, trim the front with set length.
 */
 process dettrim {
 
-  publishDir "${params.outputdir}", mode: 'copy'
-  input:
-  set val(pair_id), file(reads) from ch_read_pairs
+  publishDir "${params.outputdir}/trimmed", mode: 'link'
 
+  input:
+    tuple val(pair_id), file(reads)
+    val(truncleft)
+    val(truncright)
   output:
-  file("trimmed/${reads[0]}") into ch_dada2forReads
-  file("trimmed/${reads[1]}") into ch_dada2revReads
-  file("trimmed/*.log")
+    path "trimmed/${reads[0]}", emit: fwd_reads
+    path "trimmed/${reads[1]}", emit: rev_reads
+    path "trimmed/*.log"
 
   """
   mkdir -p t_trimleft
   mkdir -p trimmed
   echo ${pair_id}
-  seqtk trimfq -b ${conf.fwdprimerlen} ${reads[0]} | gzip > t_trimleft/${reads[0]}
-  seqtk trimfq -b ${conf.revprimerlen} ${reads[1]} | gzip > t_trimleft/${reads[1]}
+  seqtk trimfq -b ${truncleft} ${reads[0]} | gzip > t_trimleft/${reads[0]}
+  seqtk trimfq -b ${truncright} ${reads[1]} | gzip > t_trimleft/${reads[1]}
 
   bbduk.sh -Xmx1g in=t_trimleft/${reads[0]} in2=t_trimleft/${reads[1]} \
   out1=trimmed/${reads[0]} out2=trimmed/${reads[1]} \
   qtrim=r trimq=15 \
   minlength=150 stats=trimmed/stat_${pair_id}.log \
   2> trimmed/run_${pair_id}.log
-  echo "Deterministic trim with ${conf.fwdprimerlen} ${conf.revprimerlen}" > trimmed/seqtk.log
+  echo "Deterministic trim with ${params.fwdprimerlen} ${params.revprimerlen}" > trimmed/seqtk.log
   """
 }
-
-//Trim primer/adapter with matching
-// Current set to false
-// Maybe I should use this AFTER det trim to make sure that everything is clean
-
-if (false){
-    literals=conf.fwdprimer + "," + conf.revprimer
-    process heutrim {
-
-    publishDir "${params.outputdir}", mode: 'copy'
-    input:
-    set val(pair_id), file(reads) from ch_read_pairs
-
-    output:
-    file("trimmed/${reads[0]}") into ch_dada2forReads
-    file("trimmed/${reads[1]}") into ch_dada2revReads
-    file("trimmed/*.log")
-
-    """
-    mkdir -p trimmed
-    echo ${pair_id}
-    bbduk.sh -Xmx1g in=${reads[0]} in2=${reads[1]} out1=trimmed/${reads[0]} \
-      out2=trimmed/${reads[1]} \
-      literal=${literals} \
-      ktrim=l k=13 mink=6 hdist=1 qtrim=r trimq=15 \
-      minlength=150 restrictleft=25 copyundefined=T stats=trimmed/stat_${pair_id}.log \
-      2> trimmed/run_${pair_id}.log
-    """
-    }
-}
-
 
 /* Denoise
 */
 process dada2 {
-  label 'big_cpu','dada2'
+  label 'big_cpu', 'dada2'
 
   publishDir "${params.outputdir}/dada2", mode: "copy"
   input:
-    file freads from ch_dada2forReads.collect()
-    file rreads from ch_dada2revReads.collect()
+    path freads
+    path rreads
+    val fwdlen
+    val revlen
+    val trimleft
+    val trimright
 
   output:
-    file("dadaraw.tsv") into ch_dada2ext
-    file("track.tsv")
-    file("qualplotF.pdf")
-    file("qualplotR.pdf")
+    path "dadaraw.tsv", emit: dada_raw_table
+    path "track.tsv", emit: track
+    path "qualplotF.pdf"
+    path "qualplotR.pdf"
   """
   mkdir -p fwd
   mkdir -p rev
   mv ${freads} fwd
   mv ${rreads} rev
-  run_dada_paired.R fwd rev dadaraw.tsv track.tsv ff rf 0 0 0 0 2.0 2.0 2 consensus 1.0 ${task.cpus} 1000000 ${conf.pool}
+  run_dada_paired.R fwd rev dadaraw.tsv track.tsv ff rf ${fwdlen} ${revlen} ${trimleft} ${trimright} 2.0 2.0 2 consensus 1.0 ${task.cpus} 1000000 ${params.dada.pool}
   """
 }
 
 process dada2ext {
+
   publishDir "${params.outputdir}/dada2", mode: "copy"
 
   input:
-    file rawasv from ch_dada2ext
+    path rawasv
 
   output:
-    file("asv.tab")
-    file("repsep.fasta") into ch_qiime2_roottree
-    file("repsep.fasta") into ch_qiime2_bayes
+    path "asv.tab"
+    path "repsep.fasta", emit: repsep
 
-  """
-  format_dada2.py ${rawasv} ${conf.manifest} # Produce asv.tab and repsep.fasta
-  """
+  script:
+  if(params.manifestabs)
+    """
+    format_dada2.py ${rawasv} ${params.manifestabs}
+    """
+  else
+    """
+    format_dada2.py ${rawasv}
+    """
 }
 
 /*
@@ -193,25 +152,32 @@ process dada2ext {
 
 process qiime2_roottree {
 
-  label 'mod_cpu'
+  label 'big_cpu'
   publishDir "${params.outputdir}/qiime2_analysis", mode: 'copy'
   input:
-    file repsep_fasta from ch_qiime2_roottree
+    path repsep_fasta
   output:
-    file("rooted-tree.qza")
-    file("rooted-tree.nwk")
+    path "rooted-tree.qza"
+    path "rooted-tree.nwk"
 
   """
   qiime tools import --input-path ${repsep_fasta} \
     --output-path sequences.qza \
     --type 'FeatureData[Sequence]'
 
-  qiime phylogeny align-to-tree-mafft-fasttree \
-    --i-sequences sequences.qza \
-    --o-alignment aligned-rep-seqs.qza \
-    --o-masked-alignment masked-aligned-rep-seqs.qza \
-    --o-tree unrooted-tree.qza \
-    --o-rooted-tree rooted-tree.qza
+  #qiime phylogeny align-to-tree-mafft-fasttree \
+  #  --i-sequences sequences.qza \
+  #  --o-alignment aligned-rep-seqs.qza \
+  #  --o-masked-alignment masked-aligned-rep-seqs.qza \
+  #  --o-tree unrooted-tree.qza \
+  #  --o-rooted-tree rooted-tree.qza
+
+  qiime fragment-insertion sepp \
+    --i-representative-sequences ./sequences.qza \
+    --i-reference-database ${params.roottreeabs} \
+    --o-tree ./rooted-tree.qza \
+    --o-placements ./tree_placements.qza \
+    --p-threads ${task.cpus}  # update to a higher number if you can
 
   extract_fl () {
     local zipfile=\$1
@@ -227,109 +193,48 @@ process qiime2_roottree {
   """
 }
 
-  //#qiime fragment-insertion sepp \
-  //#  --i-representative-sequences ./sequences.qza \
-  //#  --i-reference-database ${conf.roottreeabs} \
-  //#  --o-tree ./rooted-tree.qza \
-  //#  --o-placements ./tree_placements.qza \
-  //#  --p-threads 1  # update to a higher number if you can
+include './libs/classify.nf'
 
-if (false) {
-process qiime2_blast {
+/*
+*  Final workflow
+*/
 
-  label 'mod_cpu'
-  publishDir "${params.outputdir}/qiime2_analysis", mode: 'copy'
-
-
-  input:
-    file repsep_fasta from ch_qiime2_bayes
-
-  output:
-    file("taxonomy.qza")
-    file("taxonomy.tsv")
-
-  """
-  model=${conf.modelabs}
-
-  qiime tools import --input-path ${repsep_fasta} \
-    --output-path sequences.qza \
-    --type 'FeatureData[Sequence]'
-
-  qiime feature-classifier classify-consensus-blast \
-    --i-query sequences.qza \
-    --i-reference-reads ${baseDir}/res/gg99_seq.qza \
-    --i-reference-taxonomy ${baseDir}/res/gg99_tax.qza \
-    --o-classification taxonomy.qza \
-    --p-strand 'plus' \
-    --p-unassignable-label unassigned
-
-  extract_fl () {
-    local zipfile=\$1
-    local lookfor=\$2
-    local location_z=\$(unzip -l \$zipfile  | gawk '{print \$4}' | grep \$lookfor)  # Hack, but work
-    echo \$location_z
-    # Unzip extract a lot of file, so force overwrite is neccessary
-    unzip -o -j \$zipfile \$location_z
-  }
-
-  extract_fl taxonomy.qza taxonomy.tsv
-  """
+/*
+include './libs/single.nf'
+workflow {
+  chan = Channel
+    .fromPath(matcher)
+    .ifEmpty { exit 1, "Cannot find anything here chief"}
+  fastqc_single(chan)
+  dettrim_single(chan)
+  publish:
+    fastqc.out to: "${params.outputdir}/fastqc", mode: 'copy'
+    dettrim.out to: "${params.outputdir}/trimmed", mode: 'link'
 }
+*/
+
+  fwdprimerlen = 20
+  revprimerlen = 24
+  fwdlen = 250
+  revlen = 240
+
+workflow {
+  chan = Channel
+    .fromFilePairs(matcher)
+    .ifEmpty { exit 1, "Cannot find anything here chief"}
+  chan.multiMap { it ->
+    fwd: it[1][0]
+    rev: it[1][1]
+  }.set { something }
+  fastqc(chan)
+//  dettrim(chan, params.fwdprimerlen, params.revprimerlen)
+//  dada2(dettrim.out.fwd_reads.collect(), dettrim.out.rev_reads.collect(), params.fwdlen, params.revlen, params.fwdprimerlen, params.revprimerlen)
+  dada2(something.fwd.collect(), something.rev.collect(), params.fwdlen, params.revlen, params.fwdprimerlen, params.revprimerlen)
+  dada2ext(dada2.out.dada_raw_table)
+  qiime2_roottree(dada2ext.out.repsep)
+  qiime2_blast(dada2ext.out.repsep, params.refseqabs, params.reftaxabs)
 }
-process qiime2_bayes {
-
-  label 'mod_cpu'
-  publishDir "${params.outputdir}/qiime2_analysis", mode: 'copy'
-
-  input:
-    file repsep_fasta from ch_qiime2_bayes
-
-  output:
-    file("taxonomy.qza")
-    file("taxonomy.tsv")
-
-  """
-  model=${conf.modelabs}
-
-  qiime tools import --input-path ${repsep_fasta} \
-    --output-path sequences.qza \
-    --type 'FeatureData[Sequence]'
-
-  qiime feature-classifier classify-sklearn \
-    --i-classifier \${model} \
-    --p-n-jobs ${task.cpus} \
-    --i-reads  sequences.qza \
-    --o-classification taxonomy.qza
-
-  extract_fl () {
-    local zipfile=\$1
-    local lookfor=\$2
-    local location_z=\$(unzip -l \$zipfile  | gawk '{print \$4}' | grep \$lookfor)  # Hack, but work
-    echo \$location_z
-    # Unzip extract a lot of file, so force overwrite is neccessary
-    unzip -o -j \$zipfile \$location_z
-  }
-
-  extract_fl taxonomy.qza taxonomy.tsv
-  """
-}
-
-process param_report {
-
-  publishDir "${params.outputdir}"
-
-  shell:
-  '''
-  echo "Export all param used into files"
-  '''
-}
-
-process report_gen {
-  publishDir "${params.outputdir}"
-
-  shell:
-  '''
-  echo "Export all param used into files"
-  '''
-
-}
+  fwdlen = 250
+  revlen = 240
+  fwdprimerlen = 20
+  revprimerlen = 24

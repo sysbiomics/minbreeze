@@ -14,13 +14,17 @@ import pandas as pd
 
 INPUT=sys.argv[1]
 # If pass the manifest, rename columns as well
+
 try:
     MANIFEST=sys.argv[2]
     with open(MANIFEST) as fh:
         mandf = pd.read_csv(MANIFEST, sep="\t")
+        # Validate and make sure that there is no duplicated data.
+        # First, forward and reverse should map to the same file.
         renmapper = dict(zip(mandf["filename"], mandf["sampleID"]))
-except:
+except IndexError:
     MANIFEST=None
+
 
 # Reformat table using MD5sum and output sequence for later use.
 a = pd.read_csv(INPUT, sep="\t", index_col=0)

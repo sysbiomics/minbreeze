@@ -226,7 +226,7 @@ if (isTRUE(pool.method) | pool.method == "pseudo"){
   mergers <- mergePairs(dadaFs, filtsF, dadaRs, filtsR)
   denoisedF <- unlist(lapply(dadaFs, getN), use.names = FALSE)
   # Make sequence table
-  seqtab <- makeSequenceTable(mergers)
+  #seqtab <- makeSequenceTable(mergers)
 
 } else if (isFALSE(pool.method)){
   # BIG DATA APPROACH
@@ -249,7 +249,6 @@ if (isTRUE(pool.method) | pool.method == "pseudo"){
   cat("Hey, I think you are doing it wrong")
   quit(1)
 }
-
 cat("\n")
 
 

@@ -1,3 +1,6 @@
-testfile/*
+.nextflow
 .nextflow.log
 .nextflow.log.[1-9]
+work/
+testin
+testout
