@@ -19,10 +19,6 @@ QIIME2 does an excellent job in making everything into the pipeline (trackable p
   4.1 Internal checking with multiqc. (https://multiqc.info/docs/#custom-content)
   4.2 Final result checking with external data (avaialble or insilico generate)
   
-## TODO [Far away, in the distance future]
-1. Implement alpha/beta with skbio instead (look at the QIIME2)
-
-
 
 # Reference
 Add protocal https://help.ezbiocloud.net/16s-mtp-protocol-for-illumina-iseq-100/
