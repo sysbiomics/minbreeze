@@ -35,7 +35,7 @@ def validateParams(){
 params.modelabs = new File(params.model).getCanonicalPath();
 // Root tree for fragment insertion
 params.roottreeabs= new File(params.modeltree).getCanonicalPath();
-params.manifestabs= new File(params.manifest).getCanonicalPath();
+// params.manifestabs= new File(params.manifest).getCanonicalPath();
 // BLAST or vsearch
 params.refseqabs = new File(params.refseq).getCanonicalPath();
 params.reftaxabs = new File(params.reftax).getCanonicalPath();
@@ -199,24 +199,22 @@ include './libs/classify.nf'
 *  Final workflow
 */
 
+// Single (forward)
+
 /*
 include './libs/single.nf'
 workflow {
-  chan = Channel
+chan = Channel
     .fromPath(matcher)
     .ifEmpty { exit 1, "Cannot find anything here chief"}
-  fastqc_single(chan)
-  dettrim_single(chan)
-  publish:
+fastqc_single(chan)
+dettrim_single(chan)
+publish:
     fastqc.out to: "${params.outputdir}/fastqc", mode: 'copy'
     dettrim.out to: "${params.outputdir}/trimmed", mode: 'link'
 }
 */
 
-  fwdprimerlen = 20
-  revprimerlen = 24
-  fwdlen = 250
-  revlen = 240
 
 workflow {
   chan = Channel
@@ -227,14 +225,13 @@ workflow {
     rev: it[1][1]
   }.set { something }
   fastqc(chan)
-//  dettrim(chan, params.fwdprimerlen, params.revprimerlen)
-//  dada2(dettrim.out.fwd_reads.collect(), dettrim.out.rev_reads.collect(), params.fwdlen, params.revlen, params.fwdprimerlen, params.revprimerlen)
-  dada2(something.fwd.collect(), something.rev.collect(), params.fwdlen, params.revlen, params.fwdprimerlen, params.revprimerlen)
+  if (params.qtrim==true){
+    dettrim(chan, params.fwdprimerlen, params.revprimerlen)
+    dada2(dettrim.out.fwd_reads.collect(), dettrim.out.rev_reads.collect(), params.fwdlen, params.revlen, params.fwdprimerlen, params.revprimerlen)
+  } else {
+    dada2(something.fwd.collect(), something.rev.collect(), params.fwdlen, params.revlen, params.fwdprimerlen, params.revprimerlen)
+  }
   dada2ext(dada2.out.dada_raw_table)
   qiime2_roottree(dada2ext.out.repsep)
   qiime2_blast(dada2ext.out.repsep, params.refseqabs, params.reftaxabs)
 }
-  fwdlen = 250
-  revlen = 240
-  fwdprimerlen = 20
-  revprimerlen = 24
