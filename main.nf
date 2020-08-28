@@ -28,7 +28,8 @@ if (params.help){
 pmatcher = params.matcher
 matcher = params.inputdir + "/" + pmatcher
 
-// Start moving config to config file
+// Cleaning config in case something does not get used,
+// For example, QIIME2_blast does not use bayes model.
 def validateParams(){
 }
 
@@ -120,7 +121,7 @@ process dada2 {
   mkdir -p rev
   mv ${freads} fwd
   mv ${rreads} rev
-  run_dada_paired.R fwd rev dadaraw.tsv track.tsv ff rf ${fwdlen} ${revlen} ${trimleft} ${trimright} 2.0 2.0 2 consensus 1.0 ${task.cpus} 1000000 ${params.dada.pool}
+  run_dada_paired.R fwd rev dadaraw.tsv track.tsv ff rf ${fwdlen} ${revlen} ${trimleft} ${trimright} 2.0 2.0 2 ${params.dada.chimera_alg} ${params.dada.chimera_fol} ${task.cpus} 1000000 ${params.dada.pool}
   """
 }
 
@@ -215,23 +216,45 @@ publish:
 }
 */
 
-
-workflow {
-  chan = Channel
-    .fromFilePairs(matcher)
-    .ifEmpty { exit 1, "Cannot find anything here chief"}
-  chan.multiMap { it ->
-    fwd: it[1][0]
-    rev: it[1][1]
-  }.set { something }
-  fastqc(chan)
+/*
   if (params.qtrim==true){
     dettrim(chan, params.fwdprimerlen, params.revprimerlen)
     dada2(dettrim.out.fwd_reads.collect(), dettrim.out.rev_reads.collect(), params.fwdlen, params.revlen, params.fwdprimerlen, params.revprimerlen)
   } else {
     dada2(something.fwd.collect(), something.rev.collect(), params.fwdlen, params.revlen, params.fwdprimerlen, params.revprimerlen)
   }
+  */
+
+workflow {
+  chan = Channel
+    .fromFilePairs(matcher)
+    .ifEmpty { exit 1, "Cannot find anything here chief"}
+  fastqc(chan)
+  if(params.qtrim==true){
+    dettrim(chan, params.fwdprimerlen, params.revprimerlen)
+    dada2(dettrim.out.fwd_reads.collect(), dettrim.out.rev_reads.collect(), params.fwdlen, params.revlen, params.fwdprimerlen, params.revprimerlen)
+  } else {
+        chan.multiMap { it ->
+            fwd: it[1][0]
+            rev: it[1][1]
+        }.set { something }
+        dada2(something.fwd.collect(), something.rev.collect(), params.fwdlen, params.revlen, params.fwdprimerlen, params.revprimerlen)
+  }
+  
   dada2ext(dada2.out.dada_raw_table)
   qiime2_roottree(dada2ext.out.repsep)
-  qiime2_blast(dada2ext.out.repsep, params.refseqabs, params.reftaxabs)
+  qiime2_bayes(dada2ext.out.repsep, params.model)
+  //qiime2_blast(dada2ext.out.repsep, params.refseqabs, params.reftaxabs)
+}
+
+
+// Export options use,
+// For now, just export everything
+import groovy.json.JsonBuilder
+workflow.onComplete {
+    // serialize
+    def builder = new JsonBuilder()
+    builder(params)
+    def output_f = new File("${params.outputdir}/pipeline.txt")
+    output_f.withWriter {w -> w << builder.toString()}
 }

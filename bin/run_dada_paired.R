@@ -220,7 +220,7 @@ ggsave("qualplotR.pdf", plot.errr, device="pdf")
 ### PROCESS ALL SAMPLES ###
 if (isTRUE(pool.method) | pool.method == "pseudo"){
   # Pool method
-  cat(paste0("Denoise with pooling method = ", as.character(pool.method)))
+  cat(paste0("Denoise with pooling method = ", as.character(pool.method), "\n"))
   dadaFs <- dada(filtsF, err=errF, pool = pool.method, multithread=multithread)
   dadaRs <- dada(filtsR, err=errR, pool = pool.method, multithread=multithread)
   mergers <- mergePairs(dadaFs, filtsF, dadaRs, filtsR)
