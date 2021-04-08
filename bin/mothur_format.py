@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
-# Convert from BIOM with taxonomy into mothur-like output
+# Convert from BIOM format with taxonomy into mothur-like output
 # Input:
 #    arg[1][tsv]: otu_table
 #    arg[2][tsv]: tax_table
 #    arg[3][tsv]: output file
 #
-    
+
 import sys
 import copy
 import argparse
@@ -27,41 +27,44 @@ output  = sys.argv[3]
 otu_table = pd.read_csv(otu_tab, sep="\t", index_col=0)
 tax_table = pd.read_csv(tax_tab, sep="\t", index_col=0)
 
-print(otu_table)
-print(tax_table)
-# Make sure that otu_table and tax_table is joinable
-#df.index.names = ['Date']
 
-# Add tax column into OTU table (which only has hash)
-#otu_table["total"] = otu_table.sum(axis=1)
+# Merge taxonomy with abundance, using taxonomy as index (multiindex)
+def taxonomy_format(taxtab):
+    addon = ["k__", "p__", "c__", "o__", "f__", "g__", "s__"]
+    newDf = []
+    for index, row in taxtab.iterrows():
+        newRow = []
+        prev = ""
+        for a, item in zip(addon, row):
+            if pd.isna(item):
+                # Use prev name + unclassified
+                newRow.append(prev + "_unclassified")
+            else:
+                prev = a + item
+                newRow.append(prev)
+        newDf.append(newRow)
 
-addon = ["k__", "p__", "c__", "o__", "f__", "g__", "s__"]
-newDf = []
-for index, row in tax_table.iterrows():
-    newRow = []
-    prev = ""
-    for a, item in zip(addon, row):
-        if pd.isna(item):
-            # Use prev name + unclassified
-            newRow.append(prev + "_unclassified")
-        else:
-            prev = a + item
-            newRow.append(prev)
-    newDf.append(newRow)
-    #tax_table.loc[index,] = newRow
+    newtaxtab = pd.DataFrame(newDf, columns=taxtab.columns, index=taxtab.index)
+    
+    return newtaxtab
 
-tax_table = pd.DataFrame(newDf, columns=tax_table.columns, index=tax_table.index)
+ntaxtab = taxonomy_format(tax_table)
+# Set all taxonomy as index
+ntaxtab = ntaxtab.sort_values(ntaxtab.columns.tolist()).set_index(ntaxtab.columns.tolist(), append=True)
+ntaxtab = ntaxtab.reorder_levels(ntaxtab.index.names[1:]  + [ntaxtab.index.names[0]])
+fulltab = ntaxtab.merge(otu_table, left_on="ID_OTU", right_index=True)
 
-@cmp_to_key
-def cmp_taxa(key1, key2):
-    if key1 == "k__Unassigned" or key1 == "unclassified":
-        return 1
-    if key2 == "k__Unassigned" or key2 == "unclassified":
-        return -1
 
-    input = [key1, key2]
-    # Lex sorted
-    return int(sorted(input) == input)
+#@cmp_to_key
+#def cmp_taxa(key1, key2):
+#    if key1 == "k__Unassigned" or key1 == "unclassified":
+#        return 1
+#    if key2 == "k__Unassigned" or key2 == "unclassified":
+#        return -1
+#
+#    input = [key1, key2]
+#    # Lex sorted
+#    return int(sorted(input) == input)
 
 class Tree(object):
     """ Tree where each node has value.
@@ -168,37 +171,23 @@ def tree_to_list_recur(node, rankID, output):
 trees = {}
 samples = otu_table.columns.values
 
-# Join table for use
-fulltab = otu_table.join(tax_table)
-fulltab["taxa"] = fulltab.reindex(columns=["kingdom", "phylum", "class", "order", "family", "genus", "species"]).values.tolist()
-fulltab = fulltab.drop(columns=["kingdom", "phylum", "class", "order", "family", "genus", "species"])
 
 def create_tree_from_sample(fulltab, sample):
     """ Create taxonomy tree with expected abundance
     """
     tree = create_tree()
-    sampledf = fulltab.reindex(columns= [sample,"taxa"] )
-    for index, (abundance, taxa_lst) in sampledf.iterrows():
+    sampledf = fulltab[sample].droplevel(level=-1) # Remove OTU Id index
+    for taxa_lst, abundance in sampledf.iteritems():
         update_chain(taxa_lst, abundance, tree)
     if REL_FLAG is True:
         normalize_tree(tree)
-    return tree
+    return sample, tree
 
-# Good thing that joblib return thing in order
-treevals = Parallel(n_jobs=10, backend="multiprocessing")(delayed(create_tree_from_sample)(fulltab, sample) for sample in samples)
+# Parallel return result in order. Also, since we built every tree with the same index, the
+# node's order should be the same
+treevals = Parallel(n_jobs=2, backend="multiprocessing")(delayed(create_tree_from_sample)(fulltab, sample) for sample in samples)
 
-tree = {}
-for treename, treeval in zip(samples, treevals):
-    trees[treename] = treeval
-#for sample in samples:
-#    print(sample)
-#    tree = create_tree()
-#    sampledf = fulltab.reindex(columns= [sample,"taxa"] )
-#    for index, (abundance, taxa_lst) in sampledf.iterrows():
-#        update_chain(taxa_lst, abundance, tree)
-#    if REL_FLAG is True:
-#        normalize_tree(tree)
-#    trees[sample] = tree
+trees = dict(treevals)
 
 # Convert list into series.
 series = []

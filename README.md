@@ -8,6 +8,9 @@ QIIME2 does an excellent job in making everything into the pipeline (trackable p
 ## What does this do then?
 16s ofcourse
 
+## How to run the pipeline
+
+
 ## TODO
 1. Report read with each steps
 2. Taxonomy classification

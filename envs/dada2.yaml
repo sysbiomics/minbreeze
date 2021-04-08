@@ -1,0 +1,10 @@
+name: dada2
+channels:
+  - conda-forge
+  - bioconda/label/cf201901
+  - bioconda
+  - defaults
+dependencies:
+  - bioconductor-dada2=1.16.0=r40h5f743cb_0
+  - bioconductor-genomeinfodb=1.24.0=r40_0
+  - bioconductor-genomeinfodbdata=1.2.3=r40_0

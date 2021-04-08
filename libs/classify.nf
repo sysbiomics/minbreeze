@@ -1,7 +1,6 @@
 process qiime2_blast {
-
-  label 'mod_cpu'
-  publishDir "${params.outputdir}/qiime2_analysis", mode: 'copy'
+    label 'mod_cpu'
+    publishDir "${params.outputdir}/qiime2_analysis", mode: 'copy'
 
   input:
     path repsep_fasta
@@ -9,10 +8,10 @@ process qiime2_blast {
     val reftax
 
   output:
-    path "taxonomy.qza"
-    path "taxonomy.tsv"
+    path 'taxonomy.qza'
+    path 'taxonomy.tsv'
 
-  """
+    """
 
   qiime tools import --input-path ${repsep_fasta} \
     --output-path sequences.qza \
@@ -40,27 +39,24 @@ process qiime2_blast {
 }
 
 process qiime2_bayes {
-
-  label 'mod_cpu'
-  publishDir "${params.outputdir}/classify", mode: 'copy'
+    label 'mod_cpu'
+    publishDir "${params.outputdir}/classify", mode: 'copy'
 
   input:
     path repsep_fasta
     val model
 
   output:
-    path "taxonomy.qza"
-    path "taxonomy.tsv"
+    path 'taxonomy.qza'
+    path 'taxonomy.tsv'
 
-  """
-  model=${params.modelabs}
-
+    """
   qiime tools import --input-path ${repsep_fasta} \
     --output-path sequences.qza \
     --type 'FeatureData[Sequence]'
 
   qiime feature-classifier classify-sklearn \
-    --i-classifier \${model} \
+    --i-classifier ${model} \
     --p-n-jobs ${task.cpus} \
     --i-reads  sequences.qza \
     --o-classification taxonomy.qza
@@ -77,3 +73,22 @@ process qiime2_bayes {
   extract_fl taxonomy.qza taxonomy.tsv
   """
 }
+
+// The cleanest way would be using switch.
+workflow classify_reads {
+  take: fasta_reads
+  main:
+    switch (params.qtrim) {
+    case true:
+            dettrim(chan, params.fwdprimerlen, params.revprimerlen)
+            dada2(dettrim.out.fwd_reads.collect(), dettrim.out.rev_reads.collect(), params.fwdlen, params.revlen, params.fwdprimerlen, params.revprimerlen)
+            break
+    default:
+        dada2(something.fwd.collect(), something.rev.collect(), params.fwdlen, params.revlen, params.fwdprimerlen, params.revprimerlen)
+            break
+    }
+  emit:
+    classified_table
+}
+
+// vi: ft=groovy
