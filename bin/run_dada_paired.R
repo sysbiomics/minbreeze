@@ -100,9 +100,13 @@
 #                 Special values: 0 - Use all input reads.
 #    Ex: 1000000
 #
-# 18) pool.raw - The pooling method to use, you could use TRUE (pooling), or pseudo, or anything else (not pooling)
+# 18) pool.method - The pooling method to use, you could use TRUE (pooling), or pseudo, or anything else (not pooling)
 #    Ex: "pseudo"
 #
+# Merge argument
+#
+# 19) minOverlap <- Overlap for merging
+
 
 cat(R.version$version.string, "\n")
 errQuit <- function(mesg, status=1) { message("Error: ", mesg); q(status=status) }
@@ -127,18 +131,21 @@ chimeraMethod <- args[[14]]
 minParentFold <- as.numeric(args[[15]])
 nthreads <- as.integer(args[[16]])
 nreads.learn <- as.integer(args[[17]])
-pool.raw <- tolower(as.character(args[[18]]))
+pool.method <- tolower(as.character(args[[18]]))
+minOverlap <- as.integer(args[19])
 
 ### VALIDATE ARGUMENTS ###
 
-# Input directory is expected to contain .fastq.gz file(s)
+# Input directory is expected to contain .fastq.gz/.fq.gz file(s)
 # that have not yet been filtered and globally trimmed
 # to the same length.
+
 if(!(dir.exists(inp.dirF) && dir.exists(inp.dirR))) {
   errQuit("Input directory does not exist.")
 } else {
-  unfiltsF <- list.files(inp.dirF, pattern=".fastq.gz$", full.names=TRUE)
-  unfiltsR <- list.files(inp.dirR, pattern=".fastq.gz$", full.names=TRUE)
+  unfiltsF <- list.files(inp.dirF, pattern=".f(?:ast)?q.gz$", full.names=TRUE)
+  unfiltsR <- list.files(inp.dirR, pattern=".f(?:ast)?q.gz$", full.names=TRUE)
+
   if(length(unfiltsF) == 0) {
     errQuit("No input forward files with the expected filename format found.")
   }
@@ -151,9 +158,9 @@ if(!(dir.exists(inp.dirF) && dir.exists(inp.dirR))) {
 }
 
 # Convert pool argument
-if(pool.raw %in% c("true", "t", "pool")){
+if(pool.method %in% c("true", "t", "pooled", "pool")){
   pool.method=TRUE
-} else if(pool.raw %in% c("pseudo")) {
+} else if(pool.method %in% c("pseudo")) {
   pool.method="pseudo"
 } else {
   pool.method=FALSE
@@ -193,12 +200,12 @@ cat("1) Filtering ")
 filtsF <- file.path(filtered.dirF, basename(unfiltsF))
 filtsR <- file.path(filtered.dirR, basename(unfiltsR))
 out <- suppressWarnings(filterAndTrim(unfiltsF, filtsF, unfiltsR, filtsR,
-                                      truncLen=c(truncLenF, truncLenR), trimLeft=c(trimLeftF, trimLeftR),
                                       maxEE=c(maxEEF, maxEER), truncQ=truncQ, rm.phix=TRUE,
                                       multithread=multithread))
 cat(ifelse(file.exists(filtsF), ".", "x"), sep="")
-filtsF <- list.files(filtered.dirF, pattern=".fastq.gz$", full.names=TRUE)
-filtsR <- list.files(filtered.dirR, pattern=".fastq.gz$", full.names=TRUE)
+
+filtsF <- list.files(filtered.dirF, pattern=".f(?:ast)?q.gz$", full.names=TRUE)
+filtsR <- list.files(filtered.dirR, pattern=".f(?:ast)?q.gz$", full.names=TRUE)
 cat("\n")
 if(length(filtsF) == 0) { # All reads were filtered out
   errQuit("No reads passed the filter (were truncLenF/R longer than the read lengths?)", status=2)
@@ -223,12 +230,12 @@ if (isTRUE(pool.method) | pool.method == "pseudo"){
   cat(paste0("Denoise with pooling method = ", as.character(pool.method), "\n"))
   dadaFs <- dada(filtsF, err=errF, pool = pool.method, multithread=multithread)
   dadaRs <- dada(filtsR, err=errR, pool = pool.method, multithread=multithread)
-  mergers <- mergePairs(dadaFs, filtsF, dadaRs, filtsR)
+  mergers <- mergePairs(dadaFs, filtsF, dadaRs, filtsR, minOverlap=minOverlap)
   denoisedF <- unlist(lapply(dadaFs, getN), use.names = FALSE)
   # Make sequence table
   #seqtab <- makeSequenceTable(mergers)
 
-} else if (isFALSE(pool.method)){
+} else if (pool.method == "independent"){
   # BIG DATA APPROACH
   # Loop over rest in streaming fashion with learned error rates
   cat("Denoise without pooling method")
@@ -240,7 +247,7 @@ if (isTRUE(pool.method) | pool.method == "pseudo"){
     ddF <- dada(drpF, err=errF, multithread=multithread, verbose=FALSE)
     drpR <- derepFastq(filtsR[[j]])
     ddR <- dada(drpR, err=errR, multithread=multithread, verbose=FALSE)
-    mergers[[j]] <- mergePairs(ddF, drpF, ddR, drpR)
+    mergers[[j]] <- mergePairs(ddF, drpF, ddR, drpR, minOverlap=minOverlap)
     denoisedF[[j]] <- getN(ddF)
     cat(".")
   }

@@ -55,17 +55,6 @@ ntaxtab = ntaxtab.reorder_levels(ntaxtab.index.names[1:]  + [ntaxtab.index.names
 fulltab = ntaxtab.merge(otu_table, left_on="ID_OTU", right_index=True)
 
 
-#@cmp_to_key
-#def cmp_taxa(key1, key2):
-#    if key1 == "k__Unassigned" or key1 == "unclassified":
-#        return 1
-#    if key2 == "k__Unassigned" or key2 == "unclassified":
-#        return -1
-#
-#    input = [key1, key2]
-#    # Lex sorted
-#    return int(sorted(input) == input)
-
 class Tree(object):
     """ Tree where each node has value.
     """

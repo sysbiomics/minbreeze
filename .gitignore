@@ -2,5 +2,6 @@
 .nextflow.log
 .nextflow.log.[1-9]
 work/
+logs/
 testin
 testout

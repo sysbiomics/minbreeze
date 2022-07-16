@@ -102,6 +102,8 @@
 #    Ex: 32
 #
 
+getN <- function(x) sum(getUniques(x))
+
 cat(R.version$version.string, "\n")
 errQuit <- function(mesg, status=1) { message("Error: ", mesg); q(status=status) }
 args <- commandArgs(TRUE)
@@ -181,6 +183,7 @@ suppressWarnings(library(dada2))
 cat("DADA2:", as.character(packageVersion("dada2")), "/",
     "Rcpp:", as.character(packageVersion("Rcpp")), "/",
     "RcppParallel:", as.character(packageVersion("RcppParallel")), "\n")
+suppressWarnings(library(ggplot2))
 
 ### TRIM AND FILTER ###
 cat("1) Filtering ")
@@ -218,11 +221,12 @@ if (isTRUE(pool.method) | pool.method == "pseudo"){
   dds <- vector("list", length(filts))
   cat("3) Denoise samples ")
   for(j in seq(length(filts))) {
-  drp <- derepFastq(filts[[j]])
-  dds[[j]] <- dada(drp, err=err, multithread=multithread,
-					HOMOPOLYMER_GAP_PENALTY=HOMOPOLYMER_GAP_PENALTY,
-					BAND_SIZE=BAND_SIZE, verbose=FALSE)
-  cat(".")
+	drp <- derepFastq(filts[[j]])
+	dds[[j]] <- dada(drp, err=err, multithread=multithread,
+						HOMOPOLYMER_GAP_PENALTY=HOMOPOLYMER_GAP_PENALTY,
+						BAND_SIZE=BAND_SIZE, verbose=FALSE)
+	cat(".")
+  }
 } else {
   # Should not be here
   cat("Hey, I think you are doing it wrong")

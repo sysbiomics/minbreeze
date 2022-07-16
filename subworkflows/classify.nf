@@ -38,7 +38,7 @@ process qiime2_bayes {
 
   input:
     path repsep_fasta
-    val model
+    path model
 
   output:
     path 'taxonomy.tsv'
@@ -54,24 +54,27 @@ process qiime2_bayes {
     --i-reads  sequences.qza \
     --o-classification taxonomy.qza
 
-  qiime tools export  --input-path taxonomy.qza --output-path .
+  qiime tools export --input-path taxonomy.qza --output-path .
   """
 }
 
 // The cleanest way would be using switch.
 workflow classify_reads {
-  take: fasta_reads
+  take: 
+    fasta_reads
+    models
   main:
     switch (params.sklearn) {
-    case true:
-            qiime2bayes
-            break
-    default:
-            qiime2blast
-            break
-    }
+        case true:
+                qiime2bayes()
+                break
+        default:
+                qiime2blast()
+                break
+        }
   emit:
-    classified_table
+    qiime2bayes.out
 }
+
 
 // vi: ft=groovy

@@ -1,7 +1,8 @@
-# Put the test file and model somewhere, might be dropbox I guess?
-
 # Download testfile
 
-#nextflow run main.nf --inputdir testin/ --matcher "*_R{1,2}_001.fastq.gz" --outputdir testout --manifest testin/manifest.tsv -profile lipid,conda -resume
-#NXF_VER=20.01.0.5264 nextflow run main.nf -profile lipid,conda,test -resume
-nextflow run main.nf -profile lipid,conda,test -resume
+NXF_VER=22.04.0 nextflow run main.nf -profile test,pbspro,conda \
+    -resume #\
+    #-with-report nextflow.html \
+    #-with-timeline timeline.html \
+    #-with-trace logs/trace.txt \
+    #-with-dag dag.png

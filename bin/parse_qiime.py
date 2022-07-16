@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-""" Parse QIIME2's taxonomy output into tab-delimited taxonomy table
+""" Parse QIIME2's taxonomy output into tab-delimited taxonomy table.
 """
 import sys
 import pandas as pd
@@ -61,14 +61,56 @@ def rdp_parse(s):
         
     return taxa_dct
 
+def qiime2_parse(s):
+    """ Parse taxonomy string in qiime2 (later) format. Return 7 levels of taxonomy.
+       Args:
+          s: taxonomy string. 
+    """
+    
+    #TODO: Make it all lowercase
+    abbr_dct = {"d": "kingdom", "p": "phylum", "c": "class", "o": "order", "f": "family", "g": "genus", "s": "species"}
+    taxa_dct = {"kingdom": "", "phylum": "", "class": "", "order": "",
+                "family": "", "genus": "", "species": ""}  # Because groupby exclude None value.
+    items = s.split("; ")
+   
+    # Check
+    if not s.startswith("d__"):
+        # Probalbly cannot identify at all.
+        return taxa_dct
+    
+    #if len(items) != 7:
+    #    raise TaxaStringError()
+        
+    for token in items:
+        abbrv, taxa = token.split("__")
+        taxa_lvl = abbr_dct[abbrv]
+        taxa = taxa if taxa else ""  # If empty, leave it as empty string
+        # If it is bracket, then remove it
+        if len(taxa) > 0 and taxa[0] == "[" and taxa[-1] == "]":
+            taxa = taxa[1:-1]
+        
+        taxa_dct[taxa_lvl] = taxa
+    
+    return taxa_dct
+
 
 inp = sys.argv[1]
 oup = sys.argv[2]
+parser = sys.argv[3]
+
+if parser == "silva":
+    parser_fn = rdp_parse
+elif parser == "gg":
+    parser_fn = gg_parse
+elif parser == "qiime2":
+    parser_fn = qiime2_parse
+else:
+    raise ValueError("Parser need to be either silva or gg")
 
 alignment = ["kingdom", "phylum", "class", "order", "family", "genus", "species"]  
 
 taxa_table = pd.read_csv(inp, sep="\t")
-taxa_str = pd.DataFrame.from_records(taxa_table.Taxon.apply(rdp_parse)).reindex(columns=alignment)
+taxa_str = pd.DataFrame.from_records(taxa_table.Taxon.apply(parser_fn)).reindex(columns=alignment)
 # First and last column are
 #taxa_tab = pd.concat([taxa_table["Feature ID"], taxa_str, taxa_table["Confidence"]], axis=1)
 taxa_tab = pd.concat([taxa_table.iloc[:, 0], taxa_str, taxa_table.iloc[:,-1]], axis=1)
