@@ -25,14 +25,21 @@ try:
 except IndexError:
     MANIFEST=None
 
-
 # Reformat table using MD5sum and output sequence for later use.
-a = pd.read_csv(INPUT, sep="\t", index_col=0)
+dadatab = pd.read_csv(INPUT, sep="\t", index_col=0)
 if MANIFEST:
-    a = a.rename(mapper=renmapper, axis=1)
-ASV_SEQ = a.index
-indexname = a.index.name
+    dadatab = dadatab.rename(mapper=renmapper, axis=1)
+ASV_SEQ = dadatab.index
+indexname = dadatab.index.name
 id_md5 = [hashlib.md5(i.encode('utf-8')).hexdigest() for i in ASV_SEQ]
+# Create table file with md5sum
+dadatab.index = id_md5
+dadatab.index.name = indexname
+#  quick hack to convert column name
+dadatab.columns = dadatab.columns.str.replace(".fastq.gz$", "", regex = True)
+
+with open("asv.tab", "w") as fho:
+    dadatab.to_csv(fho, sep="\t")
 
 # Create fasta file
 with open("repsep.fasta", "w") as fho:
@@ -41,13 +48,3 @@ with open("repsep.fasta", "w") as fho:
         fho.write(os.linesep)
         fho.write(fasta)
         fho.write(os.linesep)
-
-# Create table file with md5sum
-a.index = id_md5
-a.index.name = indexname
-# Rename
-if MANIFEST:
-    a = a.rename(columns=renmapper)
-
-with open("asv.tab", "w") as fho:
-    a.to_csv(fho, sep="\t")
