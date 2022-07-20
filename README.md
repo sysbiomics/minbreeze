@@ -1,12 +1,9 @@
 # MinBreeze
 
-The analysis pipeline use in for pair-end 16s dataset.
+The analysis pipeline uses for pair-end 16s dataset.
 
 ## Why this and not QIIME2?
 QIIME2 does an excellent job in making everything into the pipeline (trackable process, parallel run), but the effort making everything accessable end up hidden all the process. Good for the beginner I guess, but it becomes a bit annoying when you want to tinker
-
-## What does this do then?
-16s ofcourse
 
 ## How to run the pipeline
 

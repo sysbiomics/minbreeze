@@ -1,6 +1,8 @@
 process qiime2_blast {
+
     label 'big_mem'
     label 'qiime2'
+
     publishDir "${params.outputdir}/qiime2_analysis", mode: 'copy'
     publishDir "${params.outputdir}/allout", mode: 'copy'
 
@@ -10,23 +12,23 @@ process qiime2_blast {
     val reftax
 
   output:
-    path 'taxonomy.tsv'
+    path 'taxonomy_raw.tsv'
 
-    """
+  """
+    qiime tools import --input-path ${repsep_fasta} \
+        --output-path sequences.qza \
+        --type 'FeatureData[Sequence]'
 
-  qiime tools import --input-path ${repsep_fasta} \
-    --output-path sequences.qza \
-    --type 'FeatureData[Sequence]'
+    qiime feature-classifier classify-consensus-blast \
+        --i-query sequences.qza \
+        --i-reference-reads ${refseq} \
+        --i-reference-taxonomy ${reftax} \
+        --o-classification taxonomy.qza \
+        --p-strand 'plus' \
+        --p-unassignable-label unassigned
 
-  qiime feature-classifier classify-consensus-blast \
-    --i-query sequences.qza \
-    --i-reference-reads ${refseq} \
-    --i-reference-taxonomy ${reftax} \
-    --o-classification taxonomy.qza \
-    --p-strand 'plus' \
-    --p-unassignable-label unassigned
-
-  qiime tools export  --input-path taxonomy.qza --output-path .
+    qiime tools export --input-path taxonomy.qza --output-path .
+    mv taxonomy.tsv taxonomy_raw.tsv
   """
 }
 
@@ -41,7 +43,7 @@ process qiime2_bayes {
     path model
 
   output:
-    path 'taxonomy.tsv'
+    path 'taxonomy_raw.tsv'
 
     """
   qiime tools import --input-path ${repsep_fasta} \
@@ -55,6 +57,7 @@ process qiime2_bayes {
     --o-classification taxonomy.qza
 
   qiime tools export --input-path taxonomy.qza --output-path .
+  mv taxonomy.tsv taxonomy_raw.tsv
   """
 }
 

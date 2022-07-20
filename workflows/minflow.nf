@@ -1,5 +1,5 @@
 /*
- *  DAF pipeline
+ *  Minflow pipeline
  *
  */
 
@@ -13,18 +13,7 @@ ANSI_RESET = "\033[0m"
 /*
  * Default pipeline parameters
  */
-import java.nio.file.Files
-import java.nio.file.Paths
 params.help = ''
-
-def makeabs(filename) {
-    return new File(filename).getCanonicalPath()
-}
-
-def required(params) {
-    // Error if parameters is not available
-    throw new Exception('Param not exists')
-}
 
 /*
 Redefine and clean parameters
@@ -62,6 +51,7 @@ if (params.help) {
     exit 0
 }
 
+// Report
 log.info """
   =================================
   NXF-minbreeze
@@ -87,8 +77,15 @@ log.info """
   Base dir:               ${ANSI_GREEN}${baseDir}${ANSI_RESET}
   """.stripIndent()
 
-  //Fastq files:            ${ANSI_GREEN}${ readcounts } files found${ANSI_RESET}
+//
+//
+//
 
+include { picrust2                               } from '../modules/local/picrust'
+
+//
+// Workflow
+//
 
 include { INPUT_CHECK                            } from '../subworkflows/local/input_check'
 include { qiime2_bayes as classifier             } from '../subworkflows/local/classify'
@@ -149,6 +146,13 @@ process flash {
 */
 process dada2 {
 
+  label 'process_medium'
+
+  conda (params.enable_conda ? "${projectDir}/envs/dada2.yaml" : null)
+  container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+      'quay.io/biocontainers/bioconductor-dada2:1.22.0--r41h399db7b_0' :
+      'quay.io/biocontainers/bioconductor-dada2:1.22.0--r41h399db7b_0' }"
+
   publishDir "${params.outputdir}/dada2", mode: 'copy'
   publishDir "${params.outputdir}/allout", mode: 'copy'
 
@@ -161,17 +165,20 @@ process dada2 {
     path 'qualplot.pdf'
 
   """
-  mkdir -p merged
-  mv ${reads} merged
-  run_dada_single.R merged dadaraw.tsv track.tsv mm 0 0 2.0 2 500 consensus 1.0 8 1000000 pseudo NULL -1
+    mkdir -p merged
+    mv ${reads} merged
+    run_dada_single.R merged dadaraw.tsv track.tsv mm 0 0 2.0 2 500 consensus 1.0 8 1000000 pseudo NULL -1
   """
 }
 
 process export_dada2tsv {
-    publishDir "${params.outputdir}/dada2", mode: 'copy'
-    publishDir "${params.outputdir}/allout", mode: 'copy'
 
+  publishDir "${params.outputdir}/dada2", mode: 'copy'
+  publishDir "${params.outputdir}/allout", mode: 'copy'
+
+  conda (params.enable_conda ? "${projectDir}/envs/pandas.yaml" : null)
   container "amancevice/pandas:1.3.5-slim"
+
   input:
     path dada_raw
 
@@ -223,7 +230,7 @@ workflow minflow {
     //}
 
     classifier(export_dada2tsv.out.repsep, params.modeltax)
-
+    picrust2(export_dada2tsv.out.repsep, export_dada2tsv.out.asvtab, "QIIME2", "test")
 }
 
 // Export options use in this into json.
