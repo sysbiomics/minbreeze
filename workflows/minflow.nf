@@ -171,6 +171,30 @@ process dada2 {
   """
 }
 
+process dada2_pair {
+
+  publishDir "${params.outputdir}/dada2", mode: 'copy'
+  publishDir "${params.outputdir}/allout", mode: 'copy'
+  input:
+    path freads
+    path rreads
+
+  output:
+    path 'dadaraw.tsv', emit: dada_raw_table
+    path 'track.tsv', emit: track
+    path 'qualplotF.pdf'
+    path 'qualplotR.pdf'
+
+  """
+  mkdir -p fwd
+  mkdir -p rev
+  mv ${freads} fwd
+  mv ${rreads} rev
+  run_dada_paired.R fwd rev dadaraw.tsv track.tsv ff rf 0 0 0 0 2.0 2.0 2 ${params.dada.chimera_alg} ${params.dada.chimera_fol} ${task.cpus} 1000000 ${params.dada.pool} ${params.minOverlap}
+  """
+}
+
+
 process export_dada2tsv {
 
   publishDir "${params.outputdir}/dada2", mode: 'copy'
@@ -185,6 +209,7 @@ process export_dada2tsv {
   output:
     path 'asv.tab', emit: asvtab
     path 'repsep.fasta', emit: repsep
+    val "NOT QIIME2", emit: source
 
   """
     format_dada2.py ${dada_raw}
@@ -230,7 +255,7 @@ workflow minflow {
     //}
 
     classifier(export_dada2tsv.out.repsep, params.modeltax)
-    picrust2(export_dada2tsv.out.repsep, export_dada2tsv.out.asvtab, "QIIME2", "test")
+    picrust2(export_dada2tsv.out.repsep, export_dada2tsv.out.asvtab, export_dada2tsv.out.source, "test")
 }
 
 // Export options use in this into json.
@@ -245,3 +270,16 @@ workflow.onComplete {
 }
 
 // vi: ft=groovy
+
+
+//if (params.qc == true) {
+//    qc_fastp(chan, params.trimfront1, params.trimfront2, params.trimtail1, params.trimtail2 )
+//    asvcall_dada2(qc_fastp.out.fwd_reads.collect(), qc_fastp.out.rev_reads.collect())}
+//else {
+//    chan.multiMap { it ->
+//        fwd: it[1][0]
+//        rev: it[1][1]}.set { rawseqs }
+//    fwdall = rawseqs.fwd.collect()
+//    revall = rawseqs.rev.collect()
+//    asvcall_dada2(fwdall, revall)
+//}
