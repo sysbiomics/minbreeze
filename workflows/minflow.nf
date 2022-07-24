@@ -78,10 +78,12 @@ log.info """
   """.stripIndent()
 
 //
-//
+// Module
 //
 
-include { picrust2                               } from '../modules/local/picrust'
+include { picrust2                                   } from '../modules/local/picrust'
+include { qiime2_tree                                } from '../modules/local/qiime2'
+include { dada2_single; dada2_pair; export_dada2tsv  } from '../modules/local/dada2'
 
 //
 // Workflow
@@ -142,80 +144,6 @@ process flash {
   """
 }
 
-/* Denoise
-*/
-process dada2 {
-
-  label 'process_medium'
-
-  conda (params.enable_conda ? "${projectDir}/envs/dada2.yaml" : null)
-  container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-      'quay.io/biocontainers/bioconductor-dada2:1.22.0--r41h399db7b_0' :
-      'quay.io/biocontainers/bioconductor-dada2:1.22.0--r41h399db7b_0' }"
-
-  publishDir "${params.outputdir}/dada2", mode: 'copy'
-  publishDir "${params.outputdir}/allout", mode: 'copy'
-
-  input:
-    path(reads)
-
-  output:
-    path 'dadaraw.tsv', emit: dada_raw_table
-    path 'track.tsv', emit: track
-    path 'qualplot.pdf'
-
-  """
-    mkdir -p merged
-    mv ${reads} merged
-    run_dada_single.R merged dadaraw.tsv track.tsv mm 0 0 2.0 2 500 consensus 1.0 8 1000000 pseudo NULL -1
-  """
-}
-
-process dada2_pair {
-
-  publishDir "${params.outputdir}/dada2", mode: 'copy'
-  publishDir "${params.outputdir}/allout", mode: 'copy'
-  input:
-    path freads
-    path rreads
-
-  output:
-    path 'dadaraw.tsv', emit: dada_raw_table
-    path 'track.tsv', emit: track
-    path 'qualplotF.pdf'
-    path 'qualplotR.pdf'
-
-  """
-  mkdir -p fwd
-  mkdir -p rev
-  mv ${freads} fwd
-  mv ${rreads} rev
-  run_dada_paired.R fwd rev dadaraw.tsv track.tsv ff rf 0 0 0 0 2.0 2.0 2 ${params.dada.chimera_alg} ${params.dada.chimera_fol} ${task.cpus} 1000000 ${params.dada.pool} ${params.minOverlap}
-  """
-}
-
-
-process export_dada2tsv {
-
-  publishDir "${params.outputdir}/dada2", mode: 'copy'
-  publishDir "${params.outputdir}/allout", mode: 'copy'
-
-  conda (params.enable_conda ? "${projectDir}/envs/pandas.yaml" : null)
-  container "amancevice/pandas:1.3.5-slim"
-
-  input:
-    path dada_raw
-
-  output:
-    path 'asv.tab', emit: asvtab
-    path 'repsep.fasta', emit: repsep
-    val "NOT QIIME2", emit: source
-
-  """
-    format_dada2.py ${dada_raw}
-  """
-}
-
 //process clean_taxonomy_tsv {
 //    publishDir "${params.outputdir}/allout", mode: 'copy'
 //
@@ -243,8 +171,8 @@ workflow minflow {
     //  This does not work.
     // flash.out.reads.reduce([:])(map, tuple -> tuple[1]).subscribe onNext: { println it }, onComplete: { println 'Done' }
     chn_merge = flash.out.reads.flatMap(it -> it[1]).collect()
-    dada2(chn_merge)
-    export_dada2tsv(dada2.out.dada_raw_table)
+    dada2_single(chn_merge)
+    export_dada2tsv(dada2_single.out.dada_raw_table)
 
     // Skip making tree for singularity since it produce error?
     //if (params.rootmafft == true) {
