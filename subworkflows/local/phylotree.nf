@@ -1,13 +1,13 @@
 /*
   Building phylogenetic tree
 */
-process qiime2_roottree {
+process qiime2_roottree_sepp {
 
   label 'big_mem'
   label 'qiime2'
   publishDir "${params.outputdir}/qiime2_analysis", mode: 'copy'
   publishDir "${params.outputdir}/allout", mode: 'copy'
-  errorStrategy "ignore"
+  // errorStrategy "ignore"
 
   input:
     path repsep_fasta
@@ -21,7 +21,7 @@ process qiime2_roottree {
 
   shell:
   """
-  export MPLCONFIGDIR=/tmp/abc123
+  export XDG_CONFIG_HOME="\${PWD}/HOME"
   qiime tools import --input-path ${repsep_fasta} \
     --output-path sequences.qza \
     --type 'FeatureData[Sequence]'
@@ -60,48 +60,54 @@ process qiime2_roottree {
 }
 
 process qiime2_roottree_mafft {
-    label 'med_mem'
-    label 'qiime2'
-    publishDir "${params.outputdir}/qiime2_analysis", mode: 'copy'
-    publishDir "${params.outputdir}/allout", mode: 'copy'
+
+  label 'memory_medium'
+  label 'qiime2'
+
+  publishDir "${params.outputdir}/qiime2_analysis", mode: 'copy'
+  publishDir "${params.outputdir}/allout", mode: 'copy'
+
   input:
     path repsep_fasta
+
   output:
-    path 'rooted-tree.qza'
     path 'rooted-tree.nwk'
 
   shell:
   """
-  export MPLCONFIGDIR=/tmp/xyz
+  export XDG_CONFIG_HOME="\${PWD}/HOME"
+
+  # For some reason, TMPDIR break maft
+  TMPDIR=\$TMPDIR
+  unset TMPDIR
   qiime tools import --input-path ${repsep_fasta} \
     --output-path sequences.qza \
     --type 'FeatureData[Sequence]'
-
-  qiime phylogeny align-to-tree-mafft-fasttree \
+  TMPDIR= qiime phylogeny align-to-tree-mafft-fasttree \
     --i-sequences sequences.qza \
     --o-alignment aligned-rep-seqs.qza \
     --o-masked-alignment masked-aligned-rep-seqs.qza \
     --o-tree unrooted-tree.qza \
     --o-rooted-tree rooted-tree.qza \
     --p-n-threads ${task.cpus} || true
-
   qiime tools export --input-path rooted-tree.qza --output-path  .
   mv tree.nwk rooted-tree.nwk
   """
 }
 
 
-workflow qiime2_tree {
-  take:
-    fasta
-    model
 
-  main:
-    if (params.root-mafft){
-    }
-    else {
-    }
-
-  emit:
-    qiime2_roottree_mafft.out
-}
+//workflow qiime2_tree {
+//  take:
+//    fasta
+//    model
+//
+//  main:
+//    if (params.root-mafft){
+//    }
+//    else {
+//    }
+//
+//  emit:
+//    qiime2_roottree_mafft.out
+//}

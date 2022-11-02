@@ -14,6 +14,7 @@ ANSI_RESET = "\033[0m"
  * Default pipeline parameters
  */
 params.help = ''
+params.db = 'silva' // or gg
 
 /*
 Redefine and clean parameters
@@ -89,9 +90,9 @@ include { dada2_single; dada2_pair; export_dada2tsv  } from '../modules/local/da
 // Workflow
 //
 
-include { INPUT_CHECK                            } from '../subworkflows/local/input_check'
-include { qiime2_bayes as classifier             } from '../subworkflows/local/classify'
-include { qiime2_roottree_mafft; qiime2_roottree } from '../subworkflows/local/phylotree'
+include { INPUT_CHECK                                 } from '../subworkflows/local/input_check'
+include { qiime2_bayes as classifier                  } from '../subworkflows/local/classify'
+include { qiime2_roottree_mafft; qiime2_roottree_sepp } from '../subworkflows/local/phylotree'
 
 
 /*
@@ -100,7 +101,12 @@ include { qiime2_roottree_mafft; qiime2_roottree } from '../subworkflows/local/p
 */
 process fastp {
 
-    publishDir "${params.outputdir}/fastp", mode: 'link'
+  conda (params.enable_conda ? "${projectDir}/envs/minflow.yaml" : null)
+  container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+      'quay.io/biocontainers/fastp:0.23.2--h5f740d0_3' :
+      'quay.io/biocontainers/fastp:0.23.2--h5f740d0_3' }"
+
+  publishDir "${params.outputdir}/fastp", mode: 'link'
 
   input:
     tuple val(meta), path(reads)
@@ -127,6 +133,12 @@ process fastp {
 /* Merge read
 */
 process flash {
+
+  conda (params.enable_conda ? "${projectDir}/envs/minflow.yaml" : null)
+  container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+      'quay.io/biocontainers/flash:1.2.11--hed695b0_5' :
+      'quay.io/biocontainers/flash:1.2.11--hed695b0_5' }"
+
   publishDir "${params.outputdir}/flash", mode: 'link'
 
   input:
@@ -157,6 +169,7 @@ process flash {
 //}
 
 
+
 /*
 *  workflow
 */
@@ -168,22 +181,15 @@ workflow minflow {
     fastp(ch_raw_short_reads, params.trimfront1, params.trimfront2, params.trimtail1, params.trimtail2 )
     flash(fastp.out.reads)
 
-    //  This does not work.
-    // flash.out.reads.reduce([:])(map, tuple -> tuple[1]).subscribe onNext: { println it }, onComplete: { println 'Done' }
     chn_merge = flash.out.reads.flatMap(it -> it[1]).collect()
     dada2_single(chn_merge)
     export_dada2tsv(dada2_single.out.dada_raw_table)
 
-    // Skip making tree for singularity since it produce error?
-    //if (params.rootmafft == true) {
-    // qiime2_roottree_mafft(export_dada2tsv.out.repsep)
-    //}
-    //else{
-    //  qiime2_roottree(export_dada2tsv.out.repsep, export_dada2tsv.out.asvtab, params.roottree)
-    //}
+    qiime2_roottree_mafft(export_dada2tsv.out.repsep)
+    // qiime2_roottree_sepp(export_dada2tsv.out.repsep, export_dada2tsv.out.asvtab, params.roottree)
 
     classifier(export_dada2tsv.out.repsep, params.modeltax)
-    picrust2(export_dada2tsv.out.repsep, export_dada2tsv.out.asvtab, export_dada2tsv.out.source, "test")
+    picrust2(export_dada2tsv.out.repsep, export_dada2tsv.out.asvtab, export_dada2tsv.out.source, "qiime2")
 }
 
 // Export options use in this into json.

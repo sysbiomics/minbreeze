@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 
 """ Parse QIIME2's taxonomy output into tab-delimited taxonomy table.
+
+Usage:
+    python parse_qiime.py infile outfile parser [silva/gg/qiime2]
 """
 import sys
 import pandas as pd

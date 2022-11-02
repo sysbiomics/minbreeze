@@ -43,7 +43,7 @@ process qiime2_bayes {
     path model
 
   output:
-    path 'taxonomy_raw.tsv'
+    path 'taxonomy_raw.tsv', emit: taxonomy_raw
 
     """
   qiime tools import --input-path ${repsep_fasta} \
@@ -61,22 +61,42 @@ process qiime2_bayes {
   """
 }
 
+process clean_taxonomy_tsv {
+  publishDir "${params.outputdir}/allout", mode: 'copy'
+
+  container "amancevice/pandas:1.3.5-slim"
+
+  input:
+    path taxa_raw
+  
+  output:
+    path 'taxonomy.tsv', emit: taxtab
+  """
+
+  """
+}
+
 // The cleanest way would be using switch.
 workflow classify_reads {
   take: 
     fasta_reads
-    models
+    bayesmodel
+    refseq
+    reftax
+// Last two for BLAST search
   main:
-    switch (params.sklearn) {
-        case true:
-                qiime2bayes()
-                break
-        default:
-                qiime2blast()
-                break
-        }
+    if (bayesmodels != null) {
+      qiime2bayes(fasta_reads, bayesmodel)
+      cout = qiime2bayes.out
+    }
+    else if (refseq != null){
+      qiime2blast()
+      cout = qiime2blast.out
+    } else {
+
+    }
   emit:
-    qiime2bayes.out
+    taxtab = cout
 }
 
 

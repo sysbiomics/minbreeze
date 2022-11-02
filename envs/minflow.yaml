@@ -9,5 +9,6 @@ dependencies:
   - fastp=0.20.1
   - bioconductor-dada2=1.18.0
   - fastqc=0.11.9
+  - flash<=1.2.11
   - pandas=1.2.4
   - flash=1.2.11
