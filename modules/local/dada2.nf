@@ -55,7 +55,7 @@ process export_dada2tsv {
   publishDir "${params.outputdir}/allout", mode: 'copy'
 
   conda (params.enable_conda ? "${projectDir}/envs/pandas.yaml" : null)
-  container "amancevice/pandas:1.3.5-slim"
+  container "amancevice/pandas:1.3.5"
 
   input:
     path dada_raw

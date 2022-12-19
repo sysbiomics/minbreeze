@@ -4,5 +4,5 @@ channels:
   - bioconda
   - defaults
 dependencies:
-  - python=3.9.13
-  - pandas=1.2.4
+  - pandas=1.5.2=py311h8b32b4d_0
+  - python=3.11.0=ha86cf86_0_cpython
