@@ -64,7 +64,7 @@ process qiime2_bayes {
 process clean_taxonomy_tsv {
   publishDir "${params.outputdir}/allout", mode: 'copy'
 
-  container "amancevice/pandas:1.3.5-slim"
+  container "amancevice/pandas:1.3.5"
 
   input:
     path taxa_raw
@@ -72,11 +72,11 @@ process clean_taxonomy_tsv {
   output:
     path 'taxonomy.tsv', emit: taxtab
   """
-
+    # ${params.dada.chimera_alg} 
+    parse_qiime.py ${taxa_raw} taxonomy.tsv qiime2_silva
   """
 }
 
-// The cleanest way would be using switch.
 workflow classify_reads {
   take: 
     fasta_reads
@@ -85,19 +85,19 @@ workflow classify_reads {
     reftax
 // Last two for BLAST search
   main:
-    if (bayesmodels != null) {
-      qiime2bayes(fasta_reads, bayesmodel)
-      cout = qiime2bayes.out
+    if (bayesmodel != null) {
+      qiime2_bayes(fasta_reads, bayesmodel)
+      clean_taxonomy_tsv(qiime2_bayes.out.taxonomy_raw)
+      cout = clean_taxonomy_tsv.out.taxtab
     }
     else if (refseq != null){
-      qiime2blast()
-      cout = qiime2blast.out
+      qiime2_blast(refseq, reftax)
+      cout = qiime2_blast.out
     } else {
 
     }
   emit:
     taxtab = cout
 }
-
 
 // vi: ft=groovy
