@@ -15,18 +15,11 @@ ANSI_RESET = "\033[0m"
  */
 params.help = ''
 params.db = 'silva' // or gg
+params.sepp_tree = false
 
-/*
-Redefine and clean parameters
-*/
-// get counts of found fastq files
-// print params
-// reads = "${params.inputdir}/${params.fqpattern}"
-// readcounts = file(reads).size()
-
-// Tree param
-params.rootmafft = true
-params.roottree = false
+// For BLAST
+//  blastrefseq = "s3://qiime2-data/2021.8/common/"
+//  blastreftax = "s3://qiime2-data/2021.8/common/"
 
 /* End of pipeline parameter
 */
@@ -83,7 +76,6 @@ log.info """
 //
 
 include { picrust2                                   } from '../modules/local/picrust'
-include { qiime2_tree                                } from '../modules/local/qiime2'
 include { dada2_single; dada2_pair; export_dada2tsv  } from '../modules/local/dada2'
 
 //
@@ -91,7 +83,8 @@ include { dada2_single; dada2_pair; export_dada2tsv  } from '../modules/local/da
 //
 
 include { INPUT_CHECK                                 } from '../subworkflows/local/input_check'
-include { qiime2_bayes as classifier                  } from '../subworkflows/local/classify'
+include { qiime2_bayes                                } from '../subworkflows/local/classify'
+include { classify_reads                              } from '../subworkflows/local/classify'
 include { qiime2_roottree_mafft; qiime2_roottree_sepp } from '../subworkflows/local/phylotree'
 
 
@@ -185,10 +178,15 @@ workflow minflow {
     dada2_single(chn_merge)
     export_dada2tsv(dada2_single.out.dada_raw_table)
 
-    qiime2_roottree_mafft(export_dada2tsv.out.repsep)
-    // qiime2_roottree_sepp(export_dada2tsv.out.repsep, export_dada2tsv.out.asvtab, params.roottree)
+    if (params.sepp_tree) {
+       qiime2_roottree_sepp(export_dada2tsv.out.repsep, export_dada2tsv.out.asvtab, params.sepp_tree)
+    }
+    else {
+       qiime2_roottree_mafft(export_dada2tsv.out.repsep)
+    }
 
-    classifier(export_dada2tsv.out.repsep, params.modeltax)
+    classify_reads(export_dada2tsv.out.repsep, params.modeltax, null, null)
+    // qiime2_bayes(export_dada2tsv.out.repsep, params.modeltax)
     picrust2(export_dada2tsv.out.repsep, export_dada2tsv.out.asvtab, export_dada2tsv.out.source, "qiime2")
 }
 

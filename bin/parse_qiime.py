@@ -64,7 +64,7 @@ def rdp_parse(s):
         
     return taxa_dct
 
-def qiime2_parse(s):
+def qiime2_silva_parse(s):
     """ Parse taxonomy string in qiime2 (later) format. Return 7 levels of taxonomy.
        Args:
           s: taxonomy string. 
@@ -103,12 +103,12 @@ parser = sys.argv[3]
 
 if parser == "silva":
     parser_fn = rdp_parse
-elif parser == "gg":
+elif parser == "qiime2_gg":
     parser_fn = gg_parse
-elif parser == "qiime2":
-    parser_fn = qiime2_parse
+elif parser == "qiime2_silva":
+    parser_fn = qiime2_silva_parse
 else:
-    raise ValueError("Parser need to be either silva or gg")
+    raise ValueError("Parser need to be either silva, gg or qiime2")
 
 alignment = ["kingdom", "phylum", "class", "order", "family", "genus", "species"]  
 

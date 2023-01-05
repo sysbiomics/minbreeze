@@ -12,7 +12,7 @@ process qiime2_roottree_sepp {
   input:
     path repsep_fasta
     path asvtab
-    val roottree
+    path roottree
   output:
     path 'rooted-tree.qza'
     path 'rooted-tree.nwk'
@@ -22,6 +22,9 @@ process qiime2_roottree_sepp {
   shell:
   """
   export XDG_CONFIG_HOME="\${PWD}/HOME"
+  # For some reason, TMPDIR break maft
+  TMPDIR=\$TMPDIR
+  unset TMPDIR
   qiime tools import --input-path ${repsep_fasta} \
     --output-path sequences.qza \
     --type 'FeatureData[Sequence]'
@@ -83,7 +86,7 @@ process qiime2_roottree_mafft {
   qiime tools import --input-path ${repsep_fasta} \
     --output-path sequences.qza \
     --type 'FeatureData[Sequence]'
-  TMPDIR= qiime phylogeny align-to-tree-mafft-fasttree \
+  qiime phylogeny align-to-tree-mafft-fasttree \
     --i-sequences sequences.qza \
     --o-alignment aligned-rep-seqs.qza \
     --o-masked-alignment masked-aligned-rep-seqs.qza \
@@ -94,8 +97,6 @@ process qiime2_roottree_mafft {
   mv tree.nwk rooted-tree.nwk
   """
 }
-
-
 
 //workflow qiime2_tree {
 //  take:
