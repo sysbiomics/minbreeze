@@ -24,28 +24,25 @@ process picrust2 {
     tag "${seq},${abund}"
     label 'process_medium'
 
-    publishDir "${params.outputdir}/picrust2", mode: 'link'
-    publishDir "${params.outputdir}/allout", mode: 'copy', pattern: "all_output/EC_metagenome_out"
-    publishDir "${params.outputdir}/allout", mode: 'copy', pattern: "all_output/pathways_out"
-    publishDir "${params.outputdir}/allout", mode: 'copy', pattern: "all_output/KO_metagenome_out"
-
     conda (params.enable_conda ? "bioconda::picrust2=2.4.2" : null)
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/picrust2:2.4.2--pyhdfd78af_0' :
         'quay.io/biocontainers/picrust2:2.4.2--pyhdfd78af_0' }"
 
+    publishDir "${params.outputdir}/picrust2_analysis", mode: 'copy'
+
     input:
-    path(seq)
-    path(abund)
-    val(source)
-    val(message)
+      path(seq)
+      path(abund)
+      val(source)
+      val(message)
 
     output:
-    path("all_output/*") , emit: outfolder
-    path("*_descrip.tsv"), emit: pathways
-    path "versions.yml"  , emit: versions
-    path "*.args.txt"    , emit: args
-    path "${message}.txt"
+      path("picrust2_analysis/*") , emit: outfolder
+      path("*_descrip.tsv"), emit: pathways
+      path "versions.yml"  , emit: versions
+      path "*.args.txt"    , emit: args
+      path "${message}.txt"
 
     script:
     def args = task.ext.args ?: ''
@@ -60,17 +57,17 @@ process picrust2 {
         $args \\
         -s $seq \\
         -i $abund \\
-        -o all_output \\
+        -o picrust2_analysis \\
         -p $task.cpus \\
         --in_traits EC,KO \\
         --verbose
 
     #Add descriptions to identifiers
-    add_descriptions.py -i all_output/EC_metagenome_out/pred_metagenome_unstrat.tsv.gz -m EC \
+    add_descriptions.py -i picrust2_analysis/EC_metagenome_out/pred_metagenome_unstrat.tsv.gz -m EC \
                     -o EC_pred_metagenome_unstrat_descrip.tsv
-    add_descriptions.py -i all_output/KO_metagenome_out/pred_metagenome_unstrat.tsv.gz -m KO \
+    add_descriptions.py -i picrust2_analysis/KO_metagenome_out/pred_metagenome_unstrat.tsv.gz -m KO \
                     -o KO_pred_metagenome_unstrat_descrip.tsv
-    add_descriptions.py -i all_output/pathways_out/path_abun_unstrat.tsv.gz -m METACYC \
+    add_descriptions.py -i picrust2_analysis/pathways_out/path_abun_unstrat.tsv.gz -m METACYC \
                     -o METACYC_path_abun_unstrat_descrip.tsv
 
     echo "$message" > "${message}.txt"
