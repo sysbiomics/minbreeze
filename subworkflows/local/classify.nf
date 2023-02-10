@@ -1,6 +1,6 @@
 process qiime2_blast {
 
-    label 'big_mem'
+    label 'memory_high'
     label 'qiime2'
 
     publishDir "${params.outputdir}/qiime2_analysis", mode: 'copy'
@@ -33,7 +33,7 @@ process qiime2_blast {
 }
 
 process qiime2_bayes {
-    label 'big_mem'
+    label 'memory_high'
     label 'qiime2'
     publishDir "${params.outputdir}/classify", mode: 'copy'
     publishDir "${params.outputdir}/allout", mode: 'copy'

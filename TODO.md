@@ -8,6 +8,7 @@ TODO
 3. Run minpath
 4. Cache all model from QIIME2 instead of redownloading everytime.
 5. Report read with each steps
+6. Change publish_dir to resolve in higher level. https://github.com/nextflow-io/nextflow/discussions/1933#discussioncomment-411570
 
 
 TO_FIX

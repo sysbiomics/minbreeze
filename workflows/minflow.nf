@@ -15,6 +15,7 @@ ANSI_RESET = "\033[0m"
  */
 params.help = ''
 params.db = 'silva' // or gg
+params.flash_merge = true
 params.sepp_tree = false
 
 // For BLAST
@@ -124,6 +125,7 @@ process fastp {
 }
 
 /* Merge read
+TODO: Make output compatible with later
 */
 process flash {
 
@@ -149,19 +151,6 @@ process flash {
   """
 }
 
-//process clean_taxonomy_tsv {
-//    publishDir "${params.outputdir}/allout", mode: 'copy'
-//
-//  container "amancevice/pandas:1.3.5-slim"
-//
-//  input:
-//    path taxa_raw
-//  
-//  output:
-//    path 'taxonomy.tsv', emit: taxtab
-//}
-
-
 
 /*
 *  workflow
@@ -172,11 +161,23 @@ workflow minflow {
     ch_raw_long_reads  = INPUT_CHECK.out.raw_long_reads
 
     fastp(ch_raw_short_reads, params.trimfront1, params.trimfront2, params.trimtail1, params.trimtail2 )
-    flash(fastp.out.reads)
 
-    chn_merge = flash.out.reads.flatMap(it -> it[1]).collect()
-    dada2_single(chn_merge)
-    export_dada2tsv(dada2_single.out.dada_raw_table)
+    if (params.flash_merge) {
+      flash(fastp.out.reads)
+      chn_merge = flash.out.reads.flatMap(it -> it[1]).collect()
+      dada2_single(chn_merge)
+      export_dada2tsv(dada2_single.out.dada_raw_table)
+    }
+    else {  // Let's DADA2 handle everythings
+      fastp.out.reads.multiMap { it ->
+            fwd: it[1][0]
+            rev: it[1][1]}.set { rawseqs }
+      fwdall = rawseqs.fwd.collect()
+      revall = rawseqs.rev.collect()
+
+      dada2_pair(fwdall, revall)
+      export_dada2tsv(dada2_pair.out.dada_raw_table)
+    }
 
     if (params.sepp_tree) {
        qiime2_roottree_sepp(export_dada2tsv.out.repsep, export_dada2tsv.out.asvtab, params.sepp_tree)

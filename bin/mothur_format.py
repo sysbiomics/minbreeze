@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 # Convert from BIOM format with taxonomy into mothur-like output
-# Input:
+# Usage:
+# Args:
 #    arg[1][tsv]: otu_table
 #    arg[2][tsv]: tax_table
 #    arg[3][tsv]: output file
@@ -15,7 +16,9 @@ from functools import cmp_to_key
 
 import pandas as pd
 import numpy as np
-from joblib import Parallel, delayed
+#from joblib import Parallel, delayed
+
+    print("mothur_format.py otutable.txt taxtable.tsv mothuroutput")
 
 REL_FLAG = False  # Relative abundance
 TRIM_UNCLASS = False #  Trim unclassified.
@@ -161,11 +164,14 @@ trees = {}
 samples = otu_table.columns.values
 
 
-def create_tree_from_sample(fulltab, sample):
+def create_tree_from_sample(table, sample):
     """ Create taxonomy tree with expected abundance
+
+    args:
+      table
     """
     tree = create_tree()
-    sampledf = fulltab[sample].droplevel(level=-1) # Remove OTU Id index
+    sampledf = table[sample].droplevel(level=-1) # Remove OTU Id index
     for taxa_lst, abundance in sampledf.iteritems():
         update_chain(taxa_lst, abundance, tree)
     if REL_FLAG is True:
@@ -174,7 +180,8 @@ def create_tree_from_sample(fulltab, sample):
 
 # Parallel return result in order. Also, since we built every tree with the same index, the
 # node's order should be the same
-treevals = Parallel(n_jobs=2, backend="multiprocessing")(delayed(create_tree_from_sample)(fulltab, sample) for sample in samples)
+#treevals = Parallel(n_jobs=2, backend="multiprocessing")(delayed(create_tree_from_sample)(fulltab, sample) for sample in samples)
+treevals = [create_tree_from_sample(fulltab, sample) for sample in samples]
 
 trees = dict(treevals)
 

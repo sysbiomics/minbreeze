@@ -3,7 +3,7 @@
 */
 process qiime2_roottree_sepp {
 
-  label 'big_mem'
+  label 'memory_high'
   label 'qiime2'
   publishDir "${params.outputdir}/qiime2_analysis", mode: 'copy'
   publishDir "${params.outputdir}/allout", mode: 'copy'

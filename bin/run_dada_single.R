@@ -128,11 +128,6 @@ pool.raw <- args[[14]]
 HOMOPOLYMER_GAP_PENALTY <- if (args[[15]]=='NULL') NULL else as.integer(args[[15]])
 BAND_SIZE <- as.integer(args[[16]])
 
-# Hackish-fix
-# For illumina
-HOMOPLOYMER_GAP_PENALTY <- NULL
-BAND_SIZE <- 16
-
 ### VALIDATE ARGUMENTS ###
 
 # Input directory is expected to contain .fastq.gz file(s)
