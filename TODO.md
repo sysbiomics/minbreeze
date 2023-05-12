@@ -10,6 +10,20 @@ TODO
 5. Report read with each steps
 6. Change publish_dir to resolve in higher level. https://github.com/nextflow-io/nextflow/discussions/1933#discussioncomment-411570
 
+// gg-13-8-99-515-806-nb-classifier.qza
+// gg-13-8-99-515-806-nb-weighted-classifier.qza
+// gg-13-8-99-nb-classifier.qza
+// gg-13-8-99-nb-weighted-classifier.qza
+// sepp-refs-gg-13-8.qza
+// sepp-refs-silva-128.qza
+// silva-138-99-515-806-nb-classifier.qza
+// silva-138-99-nb-classifier.qza
+// silva-138-99-nb-weighted-classifier.qza
+// silva-138-99-seqs-515-806.qza
+// silva-138-99-seqs.qza
+// silva-138-99-tax-515-806.qza
+// silva-138-99-tax.qza
+
 
 TO_FIX
 =====

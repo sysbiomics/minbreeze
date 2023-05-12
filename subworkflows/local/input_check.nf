@@ -17,26 +17,24 @@ workflow INPUT_CHECK {
             .from(file(params.input))
             .splitCsv(header: true)
             .map { row ->
-                    if (row.size() == 5) {
+                    if (row.size() == 4) {
                         def id = row.sample
                         def group = row.group
-                        def sr1 = row.short_reads_1 ? file(row.short_reads_1, checkIfExists: true) : false
-                        def sr2 = row.short_reads_2 ? file(row.short_reads_2, checkIfExists: true) : false
-                        def lr = row.long_reads ? file(row.long_reads, checkIfExists: true) : false
+                        def sr1 = row.fastq_1 ? file(row.fastq_1, checkIfExists: true) : false
+                        def sr2 = row.fastq_2 ? file(row.fastq_2, checkIfExists: true) : false
                         // Check if given combination is valid
-                        if (!sr1) exit 1, "Invalid input samplesheet: short_reads_1 can not be empty."
-                        if (!sr2 && lr) exit 1, "Invalid input samplesheet: invalid combination of single-end short reads and long reads provided! SPAdes does not support single-end data and thus hybrid assembly cannot be performed."
+                        if (!sr1) exit 1, "Invalid input samplesheet: fastq_1 can not be empty."
                         if (!sr2 && !params.single_end) exit 1, "Invalid input samplesheet: single-end short reads provided, but command line parameter `--single_end` is false. Note that either only single-end or only paired-end reads must provided."
                         if (sr2 && params.single_end) exit 1, "Invalid input samplesheet: paired-end short reads provided, but command line parameter `--single_end` is true. Note that either only single-end or only paired-end reads must provided."
-                        return [ id, group, sr1, sr2, lr ]
+                        return [ id, group, sr1, sr2 ]
                     } else {
-                        exit 1, "Input samplesheet contains row with ${row.size()} column(s). Expects 5."
+                        exit 1, "Input samplesheet contains row with ${row.size()} column(s). Expects 4."
                     }
                 }
             .set { ch_input_rows }
         // separate short and long reads
         ch_input_rows
-            .map { id, group, sr1, sr2, lr ->
+            .map { id, group, sr1, sr2 ->
                         def meta = [:]
                         meta.id           = id
                         meta.group        = group
@@ -47,16 +45,6 @@ workflow INPUT_CHECK {
                             return [ meta, [ sr1, sr2 ] ]
                 }
             .set { ch_raw_short_reads }
-        ch_input_rows
-            .map { id, group, sr1, sr2, lr ->
-                        if (lr) {
-                            def meta = [:]
-                            meta.id           = id
-                            meta.group        = group
-                            return [ meta, lr ]
-                        }
-                }
-            .set { ch_raw_long_reads }
     } else {
         Channel
             .fromFilePairs(params.input, size: params.single_end ? 1 : 2)
@@ -75,11 +63,10 @@ workflow INPUT_CHECK {
 
     // Ensure sample IDs are unique
     ch_input_rows
-        .map { id, group, sr1, sr2, lr -> id }
+        .map { id, group, sr1, sr2 -> id }
         .toList()
         .map { ids -> if( ids.size() != ids.unique().size() ) {exit 1, "ERROR: input samplesheet contains duplicated sample IDs!" } }
 
     emit:
     raw_short_reads = ch_raw_short_reads
-    raw_long_reads  = ch_raw_long_reads
 }

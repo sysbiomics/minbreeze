@@ -1,5 +1,5 @@
-sample,group,short_reads_1,short_reads_2,long_reads
-463-P-C-V0D0,0,testdata/463-P-C-V0D0_R1.fastq.gz,testdata/463-P-C-V0D0_R2.fastq.gz,
-463-P-C-V5D35,0,testdata/463-P-C-V5D35_R1.fastq.gz,testdata/463-P-C-V5D35_R2.fastq.gz,
-761-C-T-V0D0,0,testdata/761-C-T-V0D0_R1.fastq.gz,testdata/761-C-T-V0D0_R2.fastq.gz,
-761-C-T-V5D35,0,testdata/761-C-T-V5D35_R1.fastq.gz,testdata/761-C-T-V5D35_R2.fastq.gz,
+sample,group,fastq_1,fastq_2
+463-P-C-V0D0,0,testdata/463-P-C-V0D0_R1.fastq.gz,testdata/463-P-C-V0D0_R2.fastq.gz
+463-P-C-V5D35,0,testdata/463-P-C-V5D35_R1.fastq.gz,testdata/463-P-C-V5D35_R2.fastq.gz
+761-C-T-V0D0,0,testdata/761-C-T-V0D0_R1.fastq.gz,testdata/761-C-T-V0D0_R2.fastq.gz
+761-C-T-V5D35,0,testdata/761-C-T-V5D35_R1.fastq.gz,testdata/761-C-T-V5D35_R2.fastq.gz

@@ -14,6 +14,18 @@ ANSI_RESET = "\033[0m"
  * Default pipeline parameters
  */
 params.help = ''
+/*
+params.fprimer = 'CCTAYGGGRBGCASCAG'
+params.rprimer = 'GGACTACNNGGGTATCTAAT'
+// Or
+params.fcut = 10
+params.rcut = 15
+/* Skip some analysis
+*/
+params.SKIP_NWKTREE = false
+params.SKIP_SEQCLAS = false
+params.SKIP_FUNCLAS = false
+
 params.db = 'silva' // or gg
 params.flash_merge = true
 params.sepp_tree = false
@@ -124,6 +136,11 @@ process fastp {
   """
 }
 
+// Primer removal*
+/*process cutadapt {
+}
+*/
+
 /* Merge read
 TODO: Make output compatible with later
 */
@@ -158,11 +175,11 @@ process flash {
 workflow minflow {
     INPUT_CHECK ()
     ch_raw_short_reads = INPUT_CHECK.out.raw_short_reads
-    ch_raw_long_reads  = INPUT_CHECK.out.raw_long_reads
+    // ch_raw_long_reads  = INPUT_CHECK.out.raw_long_reads
 
     fastp(ch_raw_short_reads, params.trimfront1, params.trimfront2, params.trimtail1, params.trimtail2 )
 
-    if (params.flash_merge) {
+    if (params.flash_merge) { // Merge and use dada2 single
       flash(fastp.out.reads)
       chn_merge = flash.out.reads.flatMap(it -> it[1]).collect()
       dada2_single(chn_merge)
@@ -179,16 +196,23 @@ workflow minflow {
       export_dada2tsv(dada2_pair.out.dada_raw_table)
     }
 
-    if (params.sepp_tree) {
-       qiime2_roottree_sepp(export_dada2tsv.out.repsep, export_dada2tsv.out.asvtab, params.sepp_tree)
-    }
-    else {
-       qiime2_roottree_mafft(export_dada2tsv.out.repsep)
+    if (! params.SKIP_NWKTREE) {
+        if (params.sepp_tree) {
+            qiime2_roottree_sepp(export_dada2tsv.out.repsep, export_dada2tsv.out.asvtab, params.sepp_tree)
+        }
+        else {
+            qiime2_roottree_mafft(export_dada2tsv.out.repsep)
+        }
     }
 
-    classify_reads(export_dada2tsv.out.repsep, params.modeltax, null, null)
-    // qiime2_bayes(export_dada2tsv.out.repsep, params.modeltax)
-    picrust2(export_dada2tsv.out.repsep, export_dada2tsv.out.asvtab, export_dada2tsv.out.source, "qiime2")
+    if (! params.SKIP_SEQCLAS) {
+        classify_reads(export_dada2tsv.out.repsep, params.modeltax, null, null)
+        // qiime2_bayes(export_dada2tsv.out.repsep, params.modeltax)
+    }
+
+    if (! params.SKIP_FUNCLAS) {
+        picrust2(export_dada2tsv.out.repsep, export_dada2tsv.out.asvtab, export_dada2tsv.out.source, "qiime2")
+    }
 }
 
 // Export options use in this into json.
@@ -202,17 +226,9 @@ workflow.onComplete {
     output_f.withWriter { w -> w << builder.toString() }
 }
 
+workflow.onError {
+    Send.sendMessage('OOP', 'localhost', 12020)
+    // println "Oops... Pipeline execution stopped with the following message: ${workflow.errorMessage}"
+}
+
 // vi: ft=groovy
-
-
-//if (params.qc == true) {
-//    qc_fastp(chan, params.trimfront1, params.trimfront2, params.trimtail1, params.trimtail2 )
-//    asvcall_dada2(qc_fastp.out.fwd_reads.collect(), qc_fastp.out.rev_reads.collect())}
-//else {
-//    chan.multiMap { it ->
-//        fwd: it[1][0]
-//        rev: it[1][1]}.set { rawseqs }
-//    fwdall = rawseqs.fwd.collect()
-//    revall = rawseqs.rev.collect()
-//    asvcall_dada2(fwdall, revall)
-//}
