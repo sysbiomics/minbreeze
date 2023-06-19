@@ -17,22 +17,19 @@ params.help = ''
 /*
 params.fprimer = 'CCTAYGGGRBGCASCAG'
 params.rprimer = 'GGACTACNNGGGTATCTAAT'
+
 // Or
-params.fcut = 10
-params.rcut = 15
+params.trimfront1 = 10
+params.trimfront2 = 15
+params.trimtail1 = 0
+params.trimtail2 = 0
+params.qtrim = true
 /* Skip some analysis
 */
-params.SKIP_NWKTREE = false
-params.SKIP_SEQCLAS = false
-params.SKIP_FUNCLAS = false
 
 params.db = 'silva' // or gg
 params.flash_merge = true
 params.sepp_tree = false
-
-// For BLAST
-//  blastrefseq = "s3://qiime2-data/2021.8/common/"
-//  blastreftax = "s3://qiime2-data/2021.8/common/"
 
 /* End of pipeline parameter
 */
@@ -125,7 +122,7 @@ process fastp {
     path 'logs/*'
 
   script:
-    def qtrim_tail = ((params.trimtail1 == 0) && (params.trimtail2 == 0)) ? "-3" : ""
+    def qtrim_tail = ((truncright1 == 0) && (truncright2 == 0)) ? "-3" : ""
   """
     mkdir logs
     fastp -i ${reads[0]} -I ${reads[1]} \
@@ -207,12 +204,13 @@ workflow minflow {
 
     if (! params.SKIP_SEQCLAS) {
         classify_reads(export_dada2tsv.out.repsep, params.modeltax, null, null)
-        // qiime2_bayes(export_dada2tsv.out.repsep, params.modeltax)
     }
 
     if (! params.SKIP_FUNCLAS) {
         picrust2(export_dada2tsv.out.repsep, export_dada2tsv.out.asvtab, export_dada2tsv.out.source, "qiime2")
     }
+
+    // Additional analysis
 }
 
 // Export options use in this into json.

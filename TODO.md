@@ -28,10 +28,9 @@ TODO
 TO_FIX
 =====
 
-
-## TODO
 3. Phylogenetic tree
   4.1 https://github.com/qiime2/q2-fragment-insertion/blob/master/q2_fragment_insertion/_insertion.py
+3.5 Run alpha diversity and beta diversity
 4. Validation of result
   4.1 Internal checking with multiqc. (https://multiqc.info/docs/#custom-content)
   4.2 Final result checking with external data (avaialble or insilico generate)
