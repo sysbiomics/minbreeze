@@ -4,7 +4,10 @@
 process qiime2_roottree_sepp {
 
   label 'memory_high'
-  label 'qiime2'
+
+  conda = "${projectDir}/envs/qiime2-2021.8-py38-linux-conda.yml"
+  container = "quay.io/qiime2/core:2021.8"
+
   publishDir "${params.outputdir}/qiime2_analysis", mode: 'copy'
   publishDir "${params.outputdir}/allout", mode: 'copy'
   // errorStrategy "ignore"
@@ -65,7 +68,9 @@ process qiime2_roottree_sepp {
 process qiime2_roottree_mafft {
 
   label 'memory_medium'
-  label 'qiime2'
+
+  conda = "${projectDir}/envs/qiime2-2021.8-py38-linux-conda.yml"
+  container = "quay.io/qiime2/core:2021.8"
 
   publishDir "${params.outputdir}/qiime2_analysis", mode: 'copy'
   publishDir "${params.outputdir}/allout", mode: 'copy'

@@ -3,7 +3,7 @@ process dada2_single {
 
   label 'process_medium'
 
-  conda (params.enable_conda ? "${projectDir}/envs/dada2.yaml" : null)
+  conda "${projectDir}/envs/dada2.yaml"
   container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
       'quay.io/biocontainers/bioconductor-dada2:1.22.0--r41h399db7b_0' :
       'quay.io/biocontainers/bioconductor-dada2:1.22.0--r41h399db7b_0' }"
@@ -30,7 +30,7 @@ process dada2_pair {
 
   label 'process_medium'
 
-  conda (params.enable_conda ? "${projectDir}/envs/dada2.yaml" : null)
+  conda "${projectDir}/envs/dada2.yaml"
   container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
       'quay.io/biocontainers/bioconductor-dada2:1.22.0--r41h399db7b_0' :
       'quay.io/biocontainers/bioconductor-dada2:1.22.0--r41h399db7b_0' }"
@@ -63,7 +63,7 @@ process export_dada2tsv {
   publishDir "${params.outputdir}/dada2", mode: 'copy'
   publishDir "${params.outputdir}/allout", mode: 'copy'
 
-  conda (params.enable_conda ? "${projectDir}/envs/pandas.yaml" : null)
+  conda "${projectDir}/envs/pandas.yaml"
   container "amancevice/pandas:1.3.5"
 
   input:

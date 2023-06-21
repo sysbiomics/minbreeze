@@ -1,7 +1,8 @@
 process qiime2_blast {
 
     label 'memory_high'
-    label 'qiime2'
+    conda = "${projectDir}/envs/qiime2-2021.8-py38-linux-conda.yml"
+    container = "quay.io/qiime2/core:2021.8"
 
     publishDir "${params.outputdir}/qiime2_analysis", mode: 'copy'
     publishDir "${params.outputdir}/allout", mode: 'copy'
@@ -33,8 +34,11 @@ process qiime2_blast {
 }
 
 process qiime2_bayes {
+
     label 'memory_high'
-    label 'qiime2'
+    conda = "${projectDir}/envs/qiime2-2021.8-py38-linux-conda.yml"
+    container = "quay.io/qiime2/core:2021.8"
+
     publishDir "${params.outputdir}/classify", mode: 'copy'
     publishDir "${params.outputdir}/allout", mode: 'copy'
 
@@ -62,6 +66,7 @@ process qiime2_bayes {
 }
 
 process clean_taxonomy_tsv {
+
   publishDir "${params.outputdir}/allout", mode: 'copy'
 
   container "amancevice/pandas:1.3.5"

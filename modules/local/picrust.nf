@@ -24,7 +24,7 @@ process picrust2 {
     tag "${seq},${abund}"
     label 'process_medium'
 
-    conda (params.enable_conda ? "bioconda::picrust2=2.4.2" : null)
+    conda "bioconda::picrust2=2.4.2"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/picrust2:2.4.2--pyhdfd78af_0' :
         'quay.io/biocontainers/picrust2:2.4.2--pyhdfd78af_0' }"

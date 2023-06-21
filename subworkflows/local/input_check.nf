@@ -1,7 +1,4 @@
-//
 // Check input samplesheet and get read channels
-//
-
 
 params.options = [:]
 

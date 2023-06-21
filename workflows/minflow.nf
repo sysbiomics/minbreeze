@@ -104,7 +104,7 @@ include { qiime2_roottree_mafft; qiime2_roottree_sepp } from '../subworkflows/lo
 */
 process fastp {
 
-  conda (params.enable_conda ? "${projectDir}/envs/minflow.yaml" : null)
+  conda "${projectDir}/envs/minflow.yaml"
   container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
       'quay.io/biocontainers/fastp:0.23.2--h5f740d0_3' :
       'quay.io/biocontainers/fastp:0.23.2--h5f740d0_3' }"
@@ -143,7 +143,7 @@ TODO: Make output compatible with later
 */
 process flash {
 
-  conda (params.enable_conda ? "${projectDir}/envs/minflow.yaml" : null)
+  conda "${projectDir}/envs/minflow.yaml"
   container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
       'quay.io/biocontainers/flash:1.2.11--hed695b0_5' :
       'quay.io/biocontainers/flash:1.2.11--hed695b0_5' }"
