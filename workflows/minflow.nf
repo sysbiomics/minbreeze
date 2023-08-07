@@ -129,7 +129,7 @@ process fastp {
       -f ${truncleft1} -F ${truncleft2} -t ${truncright1} -T ${truncright2} \
       -A -q 15 -l 210 ${qtrim_tail} \
       -o ${meta.id}_R1.trim.fastq.gz -O ${meta.id}_R2.trim.fastq.gz \
-      -j logs/${meta.id}.json -h logs/${meta.id}.html
+      -j logs/${meta.id}_fastp.json -h logs/${meta.id}.html
   """
 }
 

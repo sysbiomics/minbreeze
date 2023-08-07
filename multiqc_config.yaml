@@ -1,0 +1,12 @@
+title: "Dog microbiome quality report"
+#subtitle: "Quality report"
+#intro_text: "MultiQC reports summarise analysis results."
+#report_comment: "This is a comment about this report."
+
+module_order:
+    - fastp
+    - flash
+
+      #sp:
+      #fastp_module:
+      #fn: fastp*.json
